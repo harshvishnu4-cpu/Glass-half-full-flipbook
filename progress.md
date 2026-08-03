@@ -13,7 +13,54 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-03 (latest) — why page 1 started "after a few seconds", and the trim
+## 2026-08-03 (latest) — the book now opens by PULLING A HANGING SPIDER
+
+The author's idea, replacing the gold Play orb: a spider dangles on a silk thread
+over the cover art and the reader **drags it down** to open the book.
+
+### How it works
+- Markup: `#hangZone` in `index.html` — a `.hang-silk` line + a `<button
+  id="hint" class="spider-btn">` holding an inline-SVG spider (purple body,
+  gold star marking, white eyes, 8 arcing legs). Still the same `#hint` id, so
+  nothing else in the engine had to change.
+- **One variable drives everything.** `--pull` is registered with `@property` as a
+  `<length>`; the silk's `height` and the spider's `top` are both
+  `calc(var(--hang-y) + var(--pull))`, so the thread grows by exactly what the
+  spider drops — they cannot drift apart. CSS owns the idle dangle
+  (`spiderDangle`) and the periodic "pull me" tug (`spiderTug`); JS sets `--pull`
+  while a finger is down. Because `--pull` is registered, the release is a plain
+  CSS `transition` on a custom property — **no GSAP needed**.
+- **Input is on the tap-catcher, not the button.** `.tap-catcher` is z50 over the
+  whole cover, so the button never sees a mouse event — `overSpider()` hit-tests
+  its on-screen rect, exactly as the old `tapHitsPlay` did. The `<button>` is kept
+  for keyboard users (Enter/Space → the same pull) and now has a real focus ring.
+- Pull distances are converted to **book px** (`toBookY`), so the gesture feels
+  identical at any screen size. `PULL_OPEN` 92 book-px opens it; `PULL_MAX` 190
+  with an exponential `pullResist()` so the silk stiffens instead of hitting a wall.
+- Release: past the threshold → `snapAndOpen()` (silk whips up as the cover swings);
+  short → `springBack()` on a springy bezier, book stays shut.
+- **A plain tap still opens it** — `autoPull()` yanks the spider down and snaps it
+  back, so the gesture is *demonstrated* rather than bypassed. A child who only
+  taps is never stuck. (Say the word if it should be pull-only.)
+- Story config: **`hangAt: { x, y }`** — % of the **artwork**, since `.hang-zone`
+  is inset to match the art window. Replaces `playAt`, which the engine still
+  accepts as the old name. Placed at **27.5%, 16%** — the dark sky left of the
+  title, chosen by scoring the cover image's edge energy along the thread column,
+  under the spider and through the pull zone (`hang.js` in the scratchpad); that
+  corridor was the calmest available, so nothing in the art is hidden.
+- z-index 2 → **under `.back-fill` (z3)**, which is what makes the spider vanish
+  the moment the cover starts opening.
+- Removed the whole `.play-btn` orb (gradient disc, web SVG, ▶ glyph,
+  `playBreathe`) — no orphaned rules left behind.
+
+Verified: renders at rest, dangles, tugs on a timer; a 40px pull springs back and
+leaves the book shut; a 150px pull stretches the silk 117→248px and opens it (page
+1 then plays); a plain tap opens it; a tap anywhere else on the cover does nothing;
+no page errors.
+
+---
+
+## 2026-08-03 (earlier) — why page 1 started "after a few seconds", and the trim
 
 The author noticed the first clip doesn't start immediately. Cause, in order:
 tapping Play starts the **6s** `coverOpen` hinge (`COVER_OPEN_MS` 6000 +

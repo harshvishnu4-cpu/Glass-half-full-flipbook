@@ -1563,25 +1563,147 @@ function replayBook() {
    ========================================================================== */
 const tapCatcher = document.getElementById("tapCatcher");
 
-// The book opens ONLY from the play button. The tap-catcher still sits on top to
-// block page gestures before opening, but it opens the book only when the tap
-// lands inside the play button's (breathing) hit-circle — taps elsewhere on the
-// cover do nothing.
-function tapHitsPlay(e) {
-  const r = hint.getBoundingClientRect();
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-  const rad = Math.max(r.width, r.height) / 2;
-  return Math.hypot(e.clientX - cx, e.clientY - cy) <= rad;
-}
-if (tapCatcher) tapCatcher.addEventListener("click", function (e) { if (!opened && tapHitsPlay(e)) openBook(); });
-// Show the hand (pointer) cursor ONLY when hovering the play button — the sole CTA
-// on the cover. Everywhere else on the tap surface stays a normal cursor.
-if (tapCatcher) tapCatcher.addEventListener("mousemove", function (e) {
-  tapCatcher.style.cursor = (!opened && tapHitsPlay(e)) ? "pointer" : "default";
-});
+/* ==========================================================================
+   PULL THE SPIDER  —  how the book opens.
+   A spider hangs on a silk thread over the cover art (markup: #hangZone in
+   index.html). Drag it DOWN past PULL_OPEN book-px and let go: the silk whips
+   back and the cover swings open. A shorter pull springs back and the book stays
+   shut. A plain tap (or Enter/Space on the focused button) performs the pull
+   itself, so nobody who doesn't realise it can be dragged is ever stuck.
 
-// The play button itself (also covers keyboard: Enter/Space on the focused button).
-hint.addEventListener("click", function (e) { e.stopPropagation(); if (!opened) openBook(); });
+   Input lives on the TAP-CATCHER: it is z50 over the whole cover, so the button
+   never sees a mouse event — we hit-test its on-screen rect instead (the same
+   trick the old play button used). Distances are converted to BOOK px, so the
+   pull feels identical at every screen size.
+   ========================================================================== */
+const hangZone = document.getElementById("hangZone");
+const PULL_OPEN = 92;      // book px — pulled this far, letting go opens the book
+const PULL_MAX  = 190;     // book px — the silk can't stretch past this
+const TAP_SLOP_Y = 5;      // px of travel below which it counts as a tap, not a pull
+
+// Where the spider hangs, from story.js: hangAt: { x: "32%", y: "16%" } — % of the
+// ARTWORK (the zone matches the art window). `playAt` is still read as the old
+// name for it, so an older story.js keeps working.
+(function () {
+  if (!hangZone) return;
+  const at = STORY.hangAt || STORY.playAt || {};
+  if (at.x) hangZone.style.setProperty("--hang-x", at.x);
+  if (at.y) hangZone.style.setProperty("--hang-y", at.y);
+})();
+
+let pulling = false, pullFromY = 0, pullNow = 0, pullMoved = false, tugTimer = null;
+// Bumped by every release. A settle/auto-pull finishes only if it is still the
+// latest one, so pulling the spider again mid-spring can't be cut short by the
+// previous pull's timer.
+let settleSeq = 0;
+
+function setPull(px) {
+  pullNow = px;
+  if (hangZone) hangZone.style.setProperty("--pull", px.toFixed(1) + "px");
+}
+function hangMode(cls) {                       // exactly one of: pulling/settling/snapping
+  if (!hangZone) return;
+  hangZone.classList.remove("pulling", "settling", "snapping", "tug");
+  if (cls) hangZone.classList.add(cls);
+}
+function overSpider(e) {
+  if (!hint) return false;
+  const r = hint.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right &&
+         e.clientY >= r.top  && e.clientY <= r.bottom;
+}
+// Screen px → book px, so a pull is the same physical fraction of the book on any
+// display (the whole book is uniformly scaled by fitScale).
+function toBookY(dy) {
+  const r = flipbookEl.getBoundingClientRect();
+  return r.height ? dy * (PH / r.height) : dy;
+}
+// Silk elasticity: free up to a little past the open threshold, then increasingly
+// stiff, so it feels like stretching thread rather than hitting a wall.
+function pullResist(d) {
+  const soft = PULL_OPEN * 1.15;
+  return d <= soft ? d : soft + (PULL_MAX - soft) * (1 - Math.exp(-(d - soft) / 90));
+}
+function springBack() {                        // not far enough — bounce back, stay shut
+  const seq = ++settleSeq;
+  hangMode("settling");
+  setPull(0);
+  setTimeout(function () {
+    if (pulling || seq !== settleSeq || opened) return;
+    hangMode(null);
+    if (hangZone) hangZone.style.removeProperty("--pull");   // hand back to the idle dangle
+    scheduleTug(4200);
+  }, 460);
+}
+function snapAndOpen() {                       // far enough — silk snaps up, book opens
+  clearTimeout(tugTimer);
+  hangMode("snapping");
+  setPull(0);
+  openBook();
+}
+function autoPull() {                          // tap / keyboard: do the pull for them
+  if (opened || pulling) return;
+  const seq = ++settleSeq;
+  clearTimeout(tugTimer);
+  hangMode("settling");
+  setPull(PULL_OPEN + 26);                     // yank it down…
+  setTimeout(function () {
+    if (pulling || seq !== settleSeq) return;  // they grabbed it — their release decides
+    snapAndOpen();                             // …then snap back and open
+  }, 300);
+}
+/* The "pull me" hint: every few seconds of no interaction the spider tugs itself
+   downward and springs back. Stops for good once the book is open. */
+function scheduleTug(delay) {
+  clearTimeout(tugTimer);
+  if (!hangZone) return;
+  tugTimer = setTimeout(function () {
+    if (opened || pulling) return;
+    hangMode(null);
+    hangZone.style.removeProperty("--pull");
+    void hangZone.offsetWidth;                 // restart the animation cleanly
+    hangZone.classList.add("tug");
+    setTimeout(function () { if (!pulling) hangZone.classList.remove("tug"); }, 1200);
+    scheduleTug(6000);
+  }, delay);
+}
+if (hangZone) scheduleTug(2800);
+
+if (tapCatcher) {
+  tapCatcher.addEventListener("pointerdown", function (e) {
+    if (opened || !overSpider(e)) return;
+    e.preventDefault();
+    pulling = true; pullMoved = false; pullFromY = e.clientY;
+    hangMode("pulling");
+    clearTimeout(tugTimer);
+    tapCatcher.style.cursor = "grabbing";
+    try { tapCatcher.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  tapCatcher.addEventListener("pointermove", function (e) {
+    if (pulling) {
+      e.preventDefault();
+      if (Math.abs(e.clientY - pullFromY) > TAP_SLOP_Y) pullMoved = true;
+      setPull(Math.max(0, pullResist(toBookY(e.clientY - pullFromY))));
+      return;
+    }
+    // Cursor: only the spider is grabbable — the rest of the cover stays neutral.
+    if (!opened) tapCatcher.style.cursor = overSpider(e) ? "grab" : "default";
+  });
+  const letGo = function () {
+    if (!pulling) return;
+    pulling = false;
+    tapCatcher.style.cursor = "grab";
+    if (!pullMoved) autoPull();                          // a tap, not a pull
+    else if (pullNow >= PULL_OPEN) snapAndOpen();
+    else springBack();
+  };
+  tapCatcher.addEventListener("pointerup", letGo);
+  tapCatcher.addEventListener("pointercancel", letGo);
+}
+
+// The button itself — this is the KEYBOARD path (Enter/Space on the focused
+// spider); a mouse click lands on the tap-catcher above instead.
+hint.addEventListener("click", function (e) { e.stopPropagation(); autoPull(); });
 
 prevBtn.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); });
 nextBtn.addEventListener("click", function (e) { e.stopPropagation(); goNext(); });

@@ -50,10 +50,12 @@ window.STORY = {
   // cropping at all.
   cover: "assets/Cover page.jpg",
 
-  // Where the gold Play orb sits on the cover (% of the cover). Parked on the
-  // cauldron's black belly: clear of the title, both characters and the bubbling
-  // juice. Remove this line to use the engine's default spot.
-  playAt: { x: "50%", y: "77%" },
+  // The book opens by PULLING THE SPIDER that hangs over the cover. This is where
+  // it hangs at rest, as a % of the COVER ARTWORK: x across, y down from the top
+  // of the art (the silk hangs from there). Pick a calm patch — the silk and the
+  // spider cover whatever is behind them. This spot is the dark sky just left of
+  // the title, so nothing in the artwork is hidden.
+  hangAt: { x: "27.5%", y: "16%" },
 
   // Looping background music (any file in sfx/). Remove this line for silence.
   music: "sfx/BG Music.mp3",
