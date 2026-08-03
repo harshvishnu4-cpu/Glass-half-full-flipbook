@@ -89,11 +89,21 @@ function makeMedia(page) {
     // open + decode every clip on load (huge memory/CPU spike + open lag). We only
     // buffer the page you're on + the next one, on demand (see warmVideo()).
     media.preload = "none";
-    // Tap the video to (re)start it WITH sound — a guaranteed user gesture, so
-    // browsers that blocked the auto-start's audio will now allow it.
+    // Tapping the page RECOVERS SOUND if the browser blocked the auto-start's
+    // audio — a tap is a user gesture, so play() with sound is allowed now.
+    // It must never REPLAY the page: the bottom-right corner is exactly where the
+    // hand nudge invites a tap and where a page-turn drag starts, and a finished
+    // clip restarting under the reader's finger reads as a bug. So a clip that has
+    // ended is left alone, and one already playing with sound is left alone too.
     media.addEventListener("click", function () {
+      // A clip that has FINISHED is left alone — unless it played silently, in
+      // which case the reader never heard the page and replaying it aloud is
+      // exactly what they want.
+      if (media.ended && !media.muted) return;
+      if (!media.muted && !media.paused) return;    // already playing aloud → nothing to fix
       media.muted = false;
-      try { if (media.ended) media.currentTime = 0; } catch (_) {}
+      hideSoundHint(media);                         // sound recovered → the rescue chip goes
+      duckMusic(true);
       const p = media.play(); if (p && p.catch) p.catch(function () {});
     });
     // When THIS page's video FULLY finishes, the reader is TOLD they may turn:
@@ -102,8 +112,10 @@ function makeMedia(page) {
     // The blink fires ONCE per page arrival (armBlink) so a short clip won't
     // blink repeatedly, and is skipped on the last page.
     media.addEventListener("ended", function () {
+      hideSoundHint(media);                    // a muted clip that ends takes its hint with it
       if (!opened || !ready || lbdFullscreen) return;
       if (!leaves[flipped] || !leaves[flipped].contains(media)) return;   // only the current page
+      duckMusic(false);                        // narration over → music swells back
       // THE CUE: the clip has played out → now the page may be turned.
       if (pages[flipped] && pages[flipped].scenes) {
         // …except on a SCENES page, where the page isn't finished until its LAST
@@ -115,6 +127,7 @@ function makeMedia(page) {
         if (!layer || layer !== layers[layers.length - 1]) return;
       } else {
         videoWatched[flipped] = true;            // seen in full → never re-gate it
+        saveProgress();                          // the bookmark remembers it was watched
         dialogueDone(flipped);
       }
       if (flipped >= totalPages - 1) return;     // last page → nothing to turn to
@@ -797,9 +810,16 @@ function peelTurn(leaf, forward, opts) {
    shrinks the book a little on small screens so the arrows + progress stay visible.
    Only this CSS transform scale changes, so the paper curl is never distorted. */
 function fitScale() {
-  const CTRL = 64;                                   // min top/bottom room kept for the controls
-  const availW = window.innerWidth * 0.88;           // leave breathing space on the left + right
-  const availH = Math.min(window.innerHeight * 0.80, window.innerHeight - CTRL * 2);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Room kept above/below for the controls: PROPORTIONAL on small screens, capped
+  // at the original 64px on big ones. A fixed 64px reserved 40% of a landscape
+  // phone's 320px height, shrinking the book to a third of the screen; at 11% of
+  // height the same phone keeps a usable strip and a far bigger book, while
+  // anything laptop-sized is pixel-identical to the old layout.
+  const CTRL = Math.max(30, Math.min(64, Math.round(vh * 0.11)));
+  // Same idea sideways: small screens can afford less horizontal breathing room.
+  const availW = vw * (vw < 700 ? 0.94 : 0.88);
+  const availH = Math.min(vh * (vh < 480 ? 0.86 : 0.80), vh - CTRL * 2);
   const s = Math.min(availW / 1280, availH / 720);
   flipScaleEl.style.setProperty("--book-scale", s.toFixed(4));
   // The nav arrows sit UNDER the book's bottom corners: BACK below the
@@ -809,16 +829,21 @@ function fitScale() {
   // so the box is placed with that inset in mind; the button shrinks when
   // the strip under the book is tight.
   const bookW = 1280 * s, bookH = 720 * s, edge = 18 * s;
-  const cornerL = (window.innerWidth  - bookW) / 2 - edge;
-  const cornerR = (window.innerWidth  + bookW) / 2 + edge;
-  const cornerY = (window.innerHeight + bookH) / 2 + edge;   // book bottom edge
-  const room = window.innerHeight - cornerY - 6;             // strip below the book
-  const btn = Math.max(56, Math.min(124, Math.round(120 * s), Math.floor(room / 0.58)));
+  const cornerL = (vw - bookW) / 2 - edge;
+  const cornerR = (vw + bookW) / 2 + edge;
+  const cornerY = (vh + bookH) / 2 + edge;                   // book bottom edge
+  const room = vh - cornerY - 6;                             // strip below the book
+  const btn = Math.max(56, Math.min(124, Math.round(120 * s), Math.floor(Math.max(room, 0) / 0.58) || 56));
   const rs = document.documentElement.style;
   rs.setProperty("--arrow-size", btn + "px");
-  rs.setProperty("--arrow-y", Math.round(cornerY + 2 - 0.21 * btn) + "px");
-  rs.setProperty("--back-x",  Math.round(cornerL - btn / 2) + "px");
-  rs.setProperty("--fwd-x",   Math.round(cornerR - btn / 2) + "px");
+  // Never let the button box sink below the fold: when the strip under the book
+  // is thinner than the button (very short screens), the arrow rides up ONTO the
+  // page's bottom corner instead — still visible, still tappable.
+  const arrowY = Math.min(Math.round(cornerY + 2 - 0.21 * btn), vh - btn - 4);
+  rs.setProperty("--arrow-y", arrowY + "px");
+  // …and keep both inside the sides on very narrow screens.
+  rs.setProperty("--back-x", Math.max(2, Math.round(cornerL - btn / 2)) + "px");
+  rs.setProperty("--fwd-x",  Math.min(vw - btn - 2, Math.round(cornerR - btn / 2)) + "px");
   // keep the page-turn hint glued to the forward arrow when the viewport changes
   if (flipHint && flipHint.classList.contains("show")) positionFlipHint();
 }
@@ -850,13 +875,29 @@ let mediaDelayIdx = -1;       // which page that pending timer belongs to
 let lastMediaIdx = -1;        // last page refreshMedia handled (to arm the blink once)
 let armBlink = false;         // allow the video-end arrow blink ONCE per page arrival
 
-function playVideoNow(v) {
+/* Start (or resume) a page's clip. `restartIfEnded` is the guard against replaying
+   a page the reader has already watched: refreshMedia() is called several times per
+   turn as an idempotent safety net (flip start, flip end, a drag that snapped back),
+   and play() on a FINISHED element seeks back to 0 — so those re-asserts would
+   restart a clip the reader had just finished. Only a fresh arrival on the page
+   (or a scene landing) replays it. */
+function playVideoNow(v, restartIfEnded) {
   try {
     v.preload = "auto";                       // make sure it's buffering before we play
-    if (v.ended) v.currentTime = 0;
+    if (v.ended) {
+      if (!restartIfEnded) return;            // finished, and we're only re-asserting → leave it
+      v.currentTime = 0;
+    }
     v.muted = false;                          // try WITH sound (primed in the Play gesture)
+    duckMusic(true);                          // narration up front, music underneath
     const p = v.play();
-    if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); });
+    if (p && p.catch) p.catch(function () {
+      // Sound blocked → play silently rather than not at all, and TELL the reader
+      // how to fix it — a silent story with no cue just looks broken.
+      v.muted = true;
+      v.play().catch(function () {});
+      showSoundHint(v);
+    });
   } catch (_) {}
 }
 
@@ -1126,7 +1167,7 @@ function playScenes(idx, startDelay) {
     const bub = layer.querySelector(".bubble");
     const vid = layer.querySelector("video.page-media");
     let typedMs = 0;
-    if (vid) sceneWait(function () { playVideoNow(vid); }, revealDelay);
+    if (vid) sceneWait(function () { playVideoNow(vid, true); }, revealDelay);   // a scene landing always starts its clip
     if (bub) {
       const t = bub.querySelector(".bubble-text");
       const full = (t && t.dataset.full) || "";
@@ -1226,9 +1267,19 @@ function stopTurnCue() {
 
 function refreshMedia() {
   const idx = flipped;                         // the front-most page right now
-  if (idx !== lastMediaIdx) {
+  // Is this the reader ARRIVING on the page, or just one of the several re-asserts
+  // per turn? Only an arrival may replay a clip that has already finished.
+  const arrived = (idx !== lastMediaIdx);
+  if (arrived) {
     lastMediaIdx = idx; armBlink = true;       // arm the video-end blink once per page
     hintDoneFor = -1;                          // fresh page → nudge waits for its scenes again
+    hideSoundHint(null);                       // the muted-clip rescue belongs to the page we left
+    if (idx >= totalPages - 1) {
+      clearProgress();                         // reached THE END → next open starts fresh
+      duckMusic(false);                        // no narration here — let the music carry the page
+    } else {
+      saveProgress();                          // bookmark every landing
+    }
   }
   // Left the page a delayed video was counting down on? Cancel that countdown.
   if (mediaDelayTimer && mediaDelayIdx !== idx) {
@@ -1266,11 +1317,11 @@ function refreshMedia() {
         mediaDelayIdx = idx;
         mediaDelayTimer = setTimeout(function () {
           mediaDelayTimer = null;
-          if (flipped === idx) playVideoNow(v);               // only if still on this page
+          if (flipped === idx) playVideoNow(v, true);          // only if still on this page
         }, delayMs);
       }
     } else {
-      playVideoNow(v);                          // no delay → instant
+      playVideoNow(v, arrived);                 // no delay → instant
     }
   }
   // Reset dialogue on every page we've LEFT — delayed until the turn finishes
@@ -1433,6 +1484,8 @@ function runOpenSequence() {
   bookFloat.classList.add("rest");     // stop the idle bob
   coverScene.classList.remove("parked");
   flipbookEl.style.zIndex = "";        // cover ABOVE the pages while it swings open
+  applyResume();                       // bookmark: jump to the saved page while still hidden
+  keepAwake();                         // hands-off story → the screen must not sleep
   // Reveal the REAL page right away (it sits beneath the cover, masked by it).
   flipbookEl.classList.add("show");
   // A user gesture drives every open, so start audio here.
@@ -1440,8 +1493,8 @@ function runOpenSequence() {
   resumeAudio();
   playCoverFlip();
   playBgMusic();                        // start the looping background music
-  primeVideo(0); primeVideo(1);         // unlock page 1 + 2 inside the gesture
-  refreshMedia();                       // buffer + hold page 1 on its first frame
+  primeVideo(flipped); primeVideo(flipped + 1);   // unlock the landing page + next inside the gesture
+  refreshMedia();                       // buffer + hold the landing page on its first frame
   // Page 1's clip starts as soon as the cover is VISUALLY FLAT — the coverOpen
   // keyframes hit -180.4deg at 84%, and the last 16% is a 0.4deg settle nobody can
   // see. Waiting for the whole animation left ~1s of dead air on a page the reader
@@ -1512,7 +1565,10 @@ function resetToStart() {
   tapCatcher.style.pointerEvents = "auto";     // Play is tappable again
   hideFlipHint(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
   stopTurnCue();                               // no watchdog running behind the cover
-  try { bgMusic.pause(); bgMusic.currentTime = 0; } catch (_) {}   // stop music; restarts on Play
+  hideSoundHint(null);
+  releaseWake();                               // closed book → the screen may sleep again
+  clearProgress();                             // closing to the cover IS choosing a fresh read
+  try { bgMusic.pause(); bgMusic.currentTime = 0; bgMusic.volume = BG_VOL; } catch (_) {}   // stop music, un-ducked for next Play
   updateProgress();                            // re-sync nav state (arrows greyed)
 }
 
@@ -1805,9 +1861,11 @@ let muted = true;
 
 // Looping BACKGROUND MUSIC (from story.js) at 20% volume. Started on open (a
 // user gesture) so the browser allows it to play with sound.
+const BG_VOL   = 0.20;                        // music alone (cover, page turns, THE END)
+const DUCK_VOL = 0.06;                        // music under a page's narration
 const bgMusic = new Audio(STORY.music ? encodeURI(STORY.music) : "");
 bgMusic.loop = true;
-bgMusic.volume = 0.20;
+bgMusic.volume = BG_VOL;
 bgMusic.preload = "auto";
 function playBgMusic() {
   if (!STORY.music) return;                   // no music set → silent book
@@ -1815,6 +1873,118 @@ function playBgMusic() {
     const p = bgMusic.play();
     if (p && p.catch) p.catch(function () {});   // ignore autoplay rejections
   } catch (_) {}
+}
+/* DUCKING — the music dips while a page's clip narrates and swells back between
+   pages, so the story is always the loudest thing the child hears. (At a flat
+   20% the music sat right under every voice-over, competing with it.) */
+let _duckTween = null;
+function duckMusic(on) {
+  if (!STORY.music) return;
+  const to = on ? DUCK_VOL : BG_VOL;
+  if (G) {
+    if (_duckTween) _duckTween.kill();
+    _duckTween = G.to(bgMusic, { volume: to, duration: 0.45, ease: "sine.out", overwrite: true });
+  } else {
+    bgMusic.volume = to;
+  }
+}
+
+/* ---- SOUND RESCUE — "Tap for sound" -----------------------------------------
+   The one failure mode where the book just looks broken: the browser refuses
+   audible autoplay, the clip plays MUTED, and a child watches a silent story
+   with no idea anything is wrong. Tapping the page already fixes it (a tap is a
+   user gesture) — this chip only exists to SAY so, and only in that failure
+   mode. It hides the moment sound is recovered, or with its clip. */
+let soundHintEl = null, _soundHintFor = null;
+function showSoundHint(v) {
+  _soundHintFor = v;
+  if (!soundHintEl) {
+    soundHintEl = document.createElement("div");
+    soundHintEl.className = "sound-hint";
+    soundHintEl.setAttribute("aria-live", "polite");
+    soundHintEl.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" ' +
+      'd="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 ' +
+      '2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06 ' +
+      'c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>' +
+      "<span>Tap the page for sound</span>";
+    document.body.appendChild(soundHintEl);
+  }
+  soundHintEl.classList.add("show");
+  // sound recovered by ANY route (tap handler, OS media keys) → chip goes
+  v.addEventListener("volumechange", function onV() {
+    if (!v.muted) { v.removeEventListener("volumechange", onV); hideSoundHint(v); }
+  });
+}
+function hideSoundHint(v) {
+  if (!soundHintEl) return;
+  if (v && _soundHintFor && v !== _soundHintFor) return;   // some other clip's hint
+  soundHintEl.classList.remove("show");
+  _soundHintFor = null;
+}
+
+/* ---- WAKE LOCK — the screen must not sleep mid-story -------------------------
+   The whole book is hands-off: a child watches 15–30s clips without touching the
+   screen, and tablets dim/sleep after ~30s idle — right in the middle of a page.
+   Requested on open (a user gesture), re-acquired when the tab comes back (the
+   OS releases it on every hide), released when the book closes. Silently absent
+   on browsers without the API — worst case is the old behaviour. */
+let _wakeLock = null;
+function keepAwake() {
+  if (!opened || !navigator.wakeLock || document.hidden) return;
+  navigator.wakeLock.request("screen").then(function (wl) {
+    _wakeLock = wl;
+  }).catch(function () {});                    // denied (battery saver etc.) → fine
+}
+function releaseWake() {
+  if (_wakeLock) { try { _wakeLock.release(); } catch (_) {} _wakeLock = null; }
+}
+document.addEventListener("visibilitychange", function () {
+  if (!document.hidden) keepAwake();           // hides always drop the lock — take it back
+});
+
+/* ---- REMEMBER WHERE THE READER LEFT OFF --------------------------------------
+   Every clip is watch-to-the-end gated, so losing your place is EXPENSIVE: a
+   refresh on page 7 used to mean sitting through six clips again to get back.
+   The current page + which pages have been watched are saved on every landing;
+   opening the book later resumes right there, with the watched pages' turn cues
+   already unlocked. Finishing the story (THE END) or tapping Replay clears the
+   save — a fresh read is a deliberate act, and it gates afresh.
+   Keyed by the story's cover path, so two different books served from the same
+   origin don't inherit each other's bookmarks. localStorage can be unavailable
+   (privacy modes) — every touch is try/caught; the feature just disappears. */
+const PROGRESS_KEY = "flipbook-progress:" + (STORY.cover || "default");
+function saveProgress() {
+  try {
+    if (flipped <= 0 || flipped >= totalPages - 1) { localStorage.removeItem(PROGRESS_KEY); return; }
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify({
+      page: flipped,
+      watched: Object.keys(videoWatched).map(Number),
+    }));
+  } catch (_) {}
+}
+function clearProgress() {
+  try { localStorage.removeItem(PROGRESS_KEY); } catch (_) {}
+}
+function loadProgress() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "null");
+    if (!s || !(s.page > 0) || s.page >= totalPages - 1) return null;   // stale / story changed
+    return s;
+  } catch (_) { return null; }
+}
+/* Put the book straight into the saved pose — BEFORE the cover opens, with leaf
+   transitions suppressed so nothing visibly flips. The cover then swings open
+   onto the page the reader left, like a real bookmark. */
+function applyResume() {
+  const s = loadProgress();
+  if (!s) return;
+  flipped = s.page;
+  (s.watched || []).forEach(function (i) { videoWatched[i] = true; });
+  document.body.classList.add("no-anim");
+  renderLeaves();
+  void flipbookEl.offsetWidth;                 // pose committed without a transition
+  document.body.classList.remove("no-anim");
 }
 
 /* ---- Pause ALL audio when the tab / window goes to the background -----------

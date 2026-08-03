@@ -327,6 +327,32 @@
                         pointer ONLY over the play button (the sole CTA on the cover) */
   }
 
+  /* ==========================================================================
+     SOUND RESCUE CHIP — shown ONLY when the browser refused audible autoplay and
+     a page's clip is playing muted (see showSoundHint in script.js). One line in
+     the book's own night-and-gold voice, telling the reader the fix: tap.
+     ========================================================================== */
+  .sound-hint {
+    position: fixed; left: 50%; bottom: 5.5%; transform: translateX(-50%) translateY(8px);
+    z-index: 720; pointer-events: none;        /* the TAP must fall through to the page */
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 18px; border-radius: 999px;
+    background: rgba(20, 26, 60, 0.88);
+    border: 1.5px solid rgba(244, 214, 127, 0.55);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    color: #f6df8c; font-family: var(--font-head); font-weight: 600;
+    font-size: clamp(14px, 1.6vw, 19px); white-space: nowrap;
+    opacity: 0; visibility: hidden;
+    transition: opacity 300ms ease, transform 300ms ease, visibility 300ms;
+  }
+  .sound-hint.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+  .sound-hint svg { width: 1.25em; height: 1.25em; flex: none;
+                    animation: soundHintPulse 1.6s ease-in-out infinite; }
+  @keyframes soundHintPulse {
+    0%, 100% { opacity: 0.55; } 50% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sound-hint svg { animation: none; } }
+
   /* .flip-scale (OUTER) = responsive fit-to-screen scale (set by JS).
      .book-stage (INNER) = a plain static wrapper. There is NO zoom / camera move
      on opening — the cover's own hinge is the whole animation. */
@@ -807,6 +833,9 @@
     will-change: transform;
   }
   .leaf.flipped { transform: rotateY(-180deg); }
+  /* Resuming a saved read poses the already-turned leaves in one silent jump —
+     the reader bookmarked page N; they should not watch N pages flip on open. */
+  body.no-anim .leaf { transition: none !important; }
 
   .leaf .face {
     position: absolute; inset: 0; overflow: hidden;

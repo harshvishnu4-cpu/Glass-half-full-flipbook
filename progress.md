@@ -13,7 +13,254 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-03 (latest) — the author's own Play button; the spider is gone
+## 2026-08-03 (latest) — bats REMOVED; responsive fit for every size
+
+### Bats removed (author's call — the transition never landed)
+All three iterations are gone: the `#bats` markup, the whole BATS CSS block, the
+GSAP colony in script.js (`releaseBats`/`stopBats` + the ticker), the
+`engine/bat-frames.js` file and its `<script>` include, and the `bats:` story
+option. `assets/bats.svg` itself was left on disk (the author's artwork; unused).
+Grepped clean — the only remaining "bat" in the codebase is inside the word
+"battery". If bats ever come back, progress.md's superseded sections describe all
+three approaches and their lessons.
+
+### Responsive: audited at 17 sizes, then fixed what the numbers said
+`fitScale()` already scaled the fixed 1280×720 book into the viewport, and the
+touch-portrait rotate lock worked everywhere. Measured audit (open book, arrows
+live, video playing — `sizes2.js` in the scratchpad) found ONE real problem:
+**small phones wasted the screen** — a fixed `CTRL = 64px` control reserve ate
+40% of a 320px-tall phone, shrinking the book to 36% of the display.
+
+Changes, all in `fitScale()`:
+- **Proportional control reserve**: `CTRL = clamp(30, 11% of height, 64)`. On a
+  568×320 phone the book grew 341×192 → **444×250 (36% → 61% screen fill)**;
+  laptop-and-up layouts are pixel-identical (the 64px cap).
+- Small screens (<700px wide) breathe at 94% width instead of 88%.
+- **Arrow clamps**: the button box can no longer sink below the fold — on very
+  short screens it rides up onto the page's bottom corner (still visible, still
+  tappable) — and both arrows are pinned inside the side edges. Tap target never
+  drops below 56px.
+
+Verified across 568×320 → 3840×2160 (+ narrow/square/short desktop windows, iPad
+sizes, Fold): no book overflow, no arrow glyph off-screen, no page scroll, video
+plays everywhere. Mid-read live resize 1920×1080 ⇄ 640×360 refits cleanly with
+the video still playing. Phone-scale input model verified at 568×320: arrow turn,
+drag-back turn, page-5 ring exactly at its 46.7%/53.5% spot scaled with the book,
+tap advances the scene. Desktop full read-through clean after both changes.
+
+---
+
+## 2026-08-03 (earlier) — UX pass: ducking, bookmark-resume, sound rescue, wake lock
+
+Four experience fixes (behaviour, not looks), all in `engine/script.js` + small CSS:
+
+1. **Music ducks under narration.** At a flat 20% the BG music sat directly under
+   every voice-over. `duckMusic(on)` tweens `bgMusic.volume` 0.20 ⇄ 0.06 (GSAP,
+   450ms): down when a clip starts (`playVideoNow`), up when it ends, on THE END,
+   and reset on close. The story is now always the loudest thing a child hears.
+2. **The book remembers where the reader left off.** Every clip is
+   watch-to-the-end gated, so losing your place is expensive (a refresh on page 7
+   meant re-sitting six clips). Landing on a page saves `{page, watched[]}` to
+   localStorage (`PROGRESS_KEY`, namespaced by `STORY.cover` so different books
+   don't share bookmarks). On the next open, `applyResume()` poses the turned
+   leaves BEFORE the cover swings (leaf transitions suppressed via
+   `body.no-anim`), so the cover opens straight onto the bookmarked page with
+   watched pages' turn cues already unlocked. Reaching THE END or closing to the
+   cover (Replay) clears it — a fresh read is a deliberate act and gates afresh.
+   `primeVideo(flipped)` (was hard-coded 0/1) so the landing page still gets its
+   gesture-unlocked audio. All storage access try/caught (privacy modes).
+3. **Sound rescue.** The one failure mode that just looked broken: browser
+   refuses audible autoplay → clip plays muted → child watches a silent story
+   with no cue. Now the muted fallback also shows a small "Tap the page for
+   sound" chip (`.sound-hint`, pointer-events none so the tap falls through to
+   the page, which already unmutes). Hides on unmute (any route — volumechange),
+   with its clip, or on page turn. Exists ONLY in that failure mode.
+4. **Screen wake lock.** The book is hands-off (15–30s clips, no touching), and
+   tablets dim/sleep after ~30s idle — mid-page. `keepAwake()` requests a screen
+   wake lock on open, re-acquires on visibilitychange (the OS drops it on every
+   hide), releases on close. Silently absent where unsupported.
+
+Verified: volume 0.06 during narration / 0.20 after; read to p3 → reload → Play
+resumes ON p3 (clip playing, back arrow live, forward still gated) and a watched
+page is instantly turnable; THE END clears the bookmark; a planted bookmark at p8
+resumes, finishes, Replay + Play then starts a FRESH gated read at p1; the chip
+shows while muted and a tap recovers sound + hides it; no errors; full unforced
+read-through clean.
+
+> **Testing note:** the bookmark persists across page loads by design — headless
+> test runs should `localStorage.clear()` first or a previous run's bookmark will
+> resume the book mid-story and confuse the script.
+
+---
+
+## 2026-08-03 (earlier) — bat flight v3: GSAP-driven, alive
+
+The author found v2 (CSS offset-path spirals + steps() flap) still "not looking
+good". Diagnosis: every bat rode its spiral at CONSTANT speed with a metronome
+wingbeat — smooth, but nothing in the motion was coupled to anything else, which
+is exactly what reads as "a transition" instead of animals.
+
+v3 moves ALL motion into **GSAP** (already vendored for the peel engine): one
+`G.ticker` callback computes every bat every frame — `releaseBats()` in
+`engine/script.js`. Per bat, per frame:
+
+- **Base path**: the expanding spiral (r = R·t^1.55, 0.9–1.6 turns, cw/ccw mixed)
+  — or, for the last **3 "hero" bats**, a shallow quadratic-bezier swoop across
+  the lens (centre → wide → off the opposite edge, scaling to ~3.5×).
+- **The body rides the wingbeat** — the piece v2 lacked. `wingPhase` advances
+  per-bat; the wing pose flicks up→level→down→level from it; and the bat is
+  displaced along the path NORMAL by `sin(wingPhase)·bobAmp` — every downstroke
+  visibly lifts the body. Coupling beat↔bob is most of what "alive" looks like.
+- **Glides**: a slow per-bat oscillator gates the beat — above the threshold the
+  wings freeze on "level" and the bob melts to 15%, like a bat coasting between
+  bursts of flapping.
+- **Banking**: nose on the path tangent (numerical derivative) + a slow sway.
+- **Depth**: scale grows toward the camera; fade-in at launch, fade-out only in
+  the last stretch (off-screen by then). `dt` capped at 50ms so a tab switch
+  can't teleport wings.
+- The ticker unhooks itself and empties the layer when the last bat lands
+  (`stopBats()` also runs from close; a 6s `setTimeout` is the hard backstop).
+- **No GSAP → no bats** (reduced-motion or load failure). The bats are decoration;
+  maintaining a CSS twin of all this was not worth it. `.bats` CSS is now layout
+  only.
+
+Measured: a tracked bat arcs across the whole screen while its rotation banks
+−165°→178° and scale grows; all three poses appear with glide holds; 27 bats,
+individual curves; layer empties itself; **frame cost still zero** (median
+identical bats on/off). Full read-through clean.
+
+---
+
+## 2026-08-03 (superseded) — the bats FLAPPED and swirled in a CSS vortex
+
+The author rejected the first bat pass ("works like a transition") and asked for
+wing-flapping and a circling, cinematic flight. Root problem with v1: scaling the
+whole cloud moved every bat in lockstep — a zoom, not creatures. v2 is per-bat:
+
+### Wingbeat = sprite frames from the author's own sheet
+`assets/bats.svg` contains bats in many wing poses. Three upright ones — **#16
+(wings raised), #50 (level), #6 (wings down)** — were extracted, normalised into a
+common 100×100 box, and baked into **`engine/bat-frames.js`** (auto-generated;
+regenerate with `batextract2.js` in the session scratchpad if the sheet changes).
+Baked-in because file:// CORS blocks fetching the sheet at runtime.
+Each `.bat` element holds all three poses stacked in one inline SVG; `flapUp/
+flapMid/flapDown` keyframes gate their opacity **up → level → down → level** with
+`steps(1,end)` — a sprite flick, not a crossfade. Per-bat `--flap` (240–420ms) and
+a negative `--fdel` phase so the colony never beats in unison.
+**⚠ Sheet indices:** paths must be queried on the SHEET's element only —
+`document.querySelectorAll("path")` also picks up the engine's own UI icons
+(corner arrows, end-page star) and shifts every index. This bit once.
+
+### Flight = one outward spiral per bat (CSS offset-path)
+`releaseBats()` builds ~26 bats per open; each gets `offset-path: path(...)` —
+a spiral `r = R·t^1.5`, angle winding 1–1.6 turns, direction alternating so the
+vortex has cross-traffic — generated in px from the live viewport (R = 0.85 ×
+max(vw,vh), enough to exit even if fullscreen grows the window right after
+launch). Animating `offset-distance` flies it; `offset-rotate: auto 90deg` keeps
+the nose on the tangent so bats BANK around the circle (the sprite faces up, so
++90° aligns its head with the path direction). Depth: random `--size` 56–120px ×
+an inner `batNear` grow (0.55 → 2.2). Delays 0–1.1s stream the colony out; the
+last bat lands ≤ ~4.2s, before page 1 starts at ~5.04s.
+Fades happen at the START (first 8%) and the last 22% of the path — by then the
+bat is off-screen, so nothing pops out of existence mid-frame.
+
+### Numbers
+- First cut had 16 bats — read sparse; 26 with slightly larger sizes reads as a
+  colony without blacking out the art (the v1 four-layer version's failure mode).
+- Perf: 26 bats × ~5 animations each, all compositor-properties (offset-distance,
+  transform, opacity). Measured on/off over the same 4.2s: **median frame
+  identical, zero regression.**
+- Cleanup empties the container (`stopBats()`), so the layer is inert while
+  reading; Replay builds a fresh colony. Reduced-motion hides the whole thing.
+
+Verified: 26 bats spread from 140px to 2400px apart (individual paths, not
+lockstep); every bat shows exactly ONE pose at any instant and cycles through all
+three (sampled at 85ms); container empties after the flight; arrows still work;
+no errors; full read-through clean.
+
+---
+
+## 2026-08-03 (superseded) — BATS fly out at the reader when the book opens
+
+New asset `assets/bats.svg`: a 2500×2500 canvas holding **~67 bat silhouettes
+arranged as a radial cloud**. That layout is the whole trick — scaling the cloud up
+about its centre carries every bat outward past the edges of the screen, which IS
+"every bat flies toward the viewer", in one composited transform.
+
+### Why layers of the whole image, not 67 animated paths
+Animating each bat individually would need the SVG **inlined** so the paths are
+addressable — and `fetch()` of a local file is blocked by Chrome's file:// CORS
+rules, so a runtime fetch would break the one thing this project guarantees
+(open `index.html`, no server). Pasting 75KB of paths into index.html was the only
+alternative. So instead: **four `<img>` layers** of the same cloud at different
+sizes, delays, spins and emanation points. Four elements instead of 268, each a
+single GPU transform, and the repeated silhouettes are invisible at different
+scales and rotations.
+
+- Markup `#bats` in index.html; CSS `.bats` / `.bat-swarm` / `@keyframes batFly`.
+- Body-level and `position: fixed` — the flight belongs to the SCREEN, not the
+  book's 3D space, so bats sweep past outside the book too. z-index 680 (over the
+  book, under the corner arrows) and `pointer-events: none`.
+- Fires from `runOpenSequence()` via `releaseBats()`, right next to the cover-flip
+  sound, so the swarm bursts out as the cover lifts. Last wave lands ~4.0s, before
+  page 1's clip starts at 5.04s, so it never competes with the story.
+- The `.bats-fly` class is **removed** when the flight ends (`BATS_MS` 4000), which
+  both keeps the layer inert while reading and lets Replay play the flight again
+  (re-adding the class after a reflow restarts the animations). `stopBats()` on close.
+- Story config **`bats: "assets/bats.svg"`** — omit it and the engine deletes the
+  whole layer, so nothing about it runs for a story without a swarm.
+
+### Two things that needed tuning, not guessing
+- **Density.** Four waves at delays 0.20/0.55/0.95/1.35 all peaked together and
+  ~270 silhouettes blacked the page out. Spread to 0.20/0.70/1.20/1.70 with peak
+  opacity 0.86 → about two waves prominent at once, art visible through them.
+- **Cost.** Four large SVGs re-rasterising as they scale is the obvious risk. Measured
+  the same 4.2s window with the swarm on and off: **median frame identical (25ms in
+  this environment — that is the display's cadence, not jank), and zero frames over
+  40ms with the bats on.** `will-change: transform` promotes each layer so it is
+  rasterised once and GPU-scaled; the slight softness at 4× is invisible on
+  silhouettes and reads as motion blur.
+
+Verified: layers grow from ~100px to ~3700px and fade out; cleans up at 4.4s;
+the corner arrow still works afterwards (the layer never swallows a tap); Replay
+re-runs the whole flight; no failed loads, no errors. Reduced-motion hides it.
+
+---
+
+## 2026-08-03 (earlier) — BUGFIX: tapping the page replayed a finished clip
+
+Reported: tapping the page's **bottom-right corner** replayed the video. That corner
+is the worst possible place for it — the hand nudge points at it and a turn-drag
+starts there — so the reader trying to move on got the page over again.
+
+**Two separate routes to it**, both fixed:
+
+1. `makeMedia`'s video `click` listener did `if (media.ended) media.currentTime = 0`
+   then `play()` — so ANY click on the page (the video fills it) restarted a finished
+   clip. Its actual purpose is recovering sound when a browser blocks the auto-start's
+   audio, which is worth keeping, so the listener is now precise: it does nothing to a
+   clip that finished **with sound**, and nothing to one already playing aloud. A clip
+   that finished **muted** still replays on tap — that reader never heard the page, so
+   replaying it aloud is exactly what they want.
+2. `playVideoNow()` also reset `currentTime` on an ended clip, and `refreshMedia()`
+   runs several times per turn as an idempotent safety net (flip start, flip end, a
+   drag that snapped back). `play()` on a finished element seeks to 0 by spec, so a
+   *small drag* in the corner replayed the page too. `playVideoNow(v, restartIfEnded)`
+   now only replays a finished clip when `refreshMedia` says the reader has just
+   **arrived** on the page (`arrived = idx !== lastMediaIdx`) — re-asserts leave it
+   finished. Scene landings pass `true` explicitly.
+
+Re-entering a page still replays it from the top — that was existing, deliberate
+behaviour and is covered by a test so it can't regress silently.
+
+Verified (`cornertap.js`, `midtap.js` in the scratchpad): after page 1's clip ends, a
+corner tap / a small corner drag / a centre tap all leave it finished and paused;
+turning away and back replays from the top; and a tap DURING playback doesn't pause,
+mute, restart or stall it.
+
+---
+
+## 2026-08-03 (earlier) — the author's own Play button; the spider is gone
 
 The author supplied **`assets/play button.svg`** (210×206 — a purple spider-web
 blob with a white ▶ and two sparkles) and asked for the pull-the-spider opening to
