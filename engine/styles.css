@@ -748,80 +748,39 @@
   .cover .back .name-line { border-bottom: 3px dotted rgba(255,255,255,0.7); min-width: 62%; margin-top: 4px; }
 
   /* ==========================================================================
-     OPEN THE BOOK  —  PULL THE HANGING SPIDER
-     A spider dangles on a silk thread over the cover art; the reader drags it
-     DOWN and lets go, and the cover swings open. Both the silk's length and the
-     spider's position derive from ONE registered custom property, --pull, so they
-     can never drift apart: the silk grows by exactly what the spider drops.
-     CSS owns the idle dangle + the periodic "tug" hint; JS sets --pull while a
-     finger is down (see PULL THE SPIDER in script.js).
+     PLAY BUTTON  —  the only control on the closed cover; tapping it opens the
+     book. The artwork is an image supplied by story.js (`playButton`), so the
+     button is whatever the story's illustrator drew; the engine only places,
+     sizes and animates it. Sizes are in BOOK px (the book is a fixed 1280×720
+     scaled to the viewport), so it keeps its proportion to the cover on any
+     screen — vw units would drift.
      ========================================================================== */
-  @property --pull {
-    syntax: "<length>";
-    inherits: true;
-    initial-value: 0px;
-  }
-  /* The zone matches the ART WINDOW (.cover-img is inset 27px 48px), so the silk
-     starts at the top of the artwork and `hangAt` in story.js reads as a % of the
-     ART, not of the board. Input is handled by .tap-catcher (z50), which covers the
-     whole cover, so this layer takes no pointer events of its own. */
-  .hang-zone {
-    position: absolute; inset: 27px 48px;
-    z-index: 2;                     /* over the artwork, UNDER .back-fill (z3), which
-                                       masks it the instant the cover starts opening */
-    pointer-events: none;
-    animation: spiderDangle 3.2s ease-in-out infinite;   /* gentle idle bob */
-  }
-  .hang-zone.pulling  { animation: none; transition: none; }         /* finger down: JS drives it */
-  .hang-zone.settling { animation: none;
-                        transition: --pull 420ms cubic-bezier(0.22, 1.4, 0.36, 1); }
-  .hang-zone.snapping { animation: none;
-                        transition: --pull 240ms cubic-bezier(0.4, 0, 0.2, 1); }
-  .hang-zone.tug      { animation: spiderTug 1.15s cubic-bezier(0.34, 1.5, 0.5, 1) 1; }
-  body.is-open .hang-zone { animation: none; }      /* nothing to dangle once we are reading */
-
-  /* the silk: a fine highlight line from the top of the art down to the spider */
-  .hang-silk {
-    position: absolute; top: 0; left: var(--hang-x, 32%);
-    width: 2px; margin-left: -1px;
-    height: calc(var(--hang-y, 16%) + var(--pull, 0px));
-    background: linear-gradient(180deg,
-      rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.34) 35%, rgba(255,255,255,0.68) 100%);
-    filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
-  }
-  /* The spider. The BUTTON is a generous grab area (small fingers, no aiming) and
-     the drawing inside is smaller. Kept a real <button> so keyboard users can
-     Enter/Space it — that runs the same pull. */
-  .spider-btn {
-    position: absolute; left: var(--hang-x, 32%);
-    top: calc(var(--hang-y, 16%) + var(--pull, 0px));
+  .play-btn {
+    position: absolute;
+    left: var(--play-x, 50%); top: var(--play-y, 63%);
     transform: translate(-50%, -50%);
-    width: 180px; height: 180px;
+    z-index: 2;                      /* over the artwork, UNDER .back-fill (z3), which
+                                        masks it the instant the cover starts opening */
+    width: 168px; height: 168px;     /* generous tap target for small fingers */
     border: 0; padding: 0; background: none; border-radius: 50%;
     display: grid; place-items: center;
-    cursor: grab; -webkit-tap-highlight-color: transparent;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    animation: playBreathe 2.6s ease-in-out infinite;   /* a slow, calm "press me" */
   }
-  /* Big enough to be THE thing on the cover, with a warm halo so it separates from
-     a sky full of glowing lanterns instead of reading as one of them. */
-  .spider-btn .spider {
-    width: 132px; height: 132px; display: block;
-    filter: drop-shadow(0 8px 13px rgba(0,0,0,0.6))
-            drop-shadow(0 0 16px rgba(246,223,140,0.34));
+  .play-btn .play-art {
+    width: 100%; height: 100%; display: block;
+    filter: drop-shadow(0 9px 14px rgba(6, 4, 26, 0.55));
+    -webkit-user-drag: none; user-drag: none;
   }
-  /* a visible focus ring for keyboard users (the old orb removed it entirely) */
-  .spider-btn:focus-visible {
-    outline: 2.5px dashed #f6df8c; outline-offset: -14px;
+  .play-btn:active { animation: none; transform: translate(-50%, -50%) scale(0.94); }
+  .play-btn:focus-visible {
+    outline: 2.5px dashed #f6df8c; outline-offset: 2px;
   }
-  /* IDLE — breathing on the thread, so it reads as alive and grabbable. */
-  @keyframes spiderDangle {
-    0%, 100% { --pull: 0px; }
-    50%      { --pull: 10px; }
-  }
-  /* TUG — the periodic "pull me" hint: drops a good way, then springs back. */
-  @keyframes spiderTug {
-    0%   { --pull: 0px; }
-    32%  { --pull: 36px; }
-    100% { --pull: 0px; }
+  /* BREATHING — grows a touch and settles, like a calm breath. The translate must
+     be repeated in the keyframes or the animation would drop the centring. */
+  @keyframes playBreathe {
+    0%, 100% { transform: translate(-50%, -50%) scale(1);    }
+    50%      { transform: translate(-50%, -50%) scale(1.07); }
   }
 
   /* ==========================================================================
@@ -1283,8 +1242,8 @@
   /* Respect users who prefer less motion */
   @media (prefers-reduced-motion: reduce) {
     .book-float { animation: none; } .scene { animation: none; }
-    /* the spider stops dangling, but pulling it still works */
-    .hang-zone { animation: none; }
+    /* the Play button stops breathing, but still opens the book */
+    .play-btn { animation: none; }
     .book.open .cover { animation-duration: 420ms; }
     .book.open .cover .front .curl, body.is-open .cover-cast { animation-duration: 420ms; }
     :root { --flip-ms: 260ms; --cover-ms: 340ms; }

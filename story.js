@@ -50,12 +50,13 @@ window.STORY = {
   // cropping at all.
   cover: "assets/Cover page.jpg",
 
-  // The book opens by PULLING THE SPIDER that hangs over the cover. This is where
-  // it hangs at rest, as a % of the COVER ARTWORK: x across, y down from the top
-  // of the art (the silk hangs from there). Pick a calm patch — the silk and the
-  // spider cover whatever is behind them. This spot is the dark sky just left of
-  // the title, so nothing in the artwork is hidden.
-  hangAt: { x: "27.5%", y: "16%" },
+  // The Play button on the closed cover — tapping it opens the book.
+  //   playButton : the button artwork (any image in assets/).
+  //   playAt     : where it sits, as a % of the cover. Put it over a calm part of
+  //                your cover art — here the cauldron's black belly, clear of the
+  //                title, both characters and the bubbling juice.
+  playButton: "assets/play button.svg",
+  playAt: { x: "50%", y: "77%" },
 
   // Looping background music (any file in sfx/). Remove this line for silence.
   music: "sfx/BG Music.mp3",

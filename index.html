@@ -111,55 +111,14 @@
                 </svg>
                 <div class="back-fill"></div>
                 <div class="curl"></div>
-                <!-- OPEN THE BOOK: a spider hangs on a silk thread over the
-                     artwork and the reader PULLS IT DOWN. The zone is inset to
-                     match the art window (.cover-img), so the silk starts at the
-                     very top of the artwork and `hangAt` in story.js is a % of
-                     the ART. The silk's height and the spider's position both read
-                     ONE custom property (--pull), so they can never drift apart:
-                     CSS animates the idle dangle, JS drives it while pulled. -->
-                <div class="hang-zone" id="hangZone">
-                  <span class="hang-silk" aria-hidden="true"></span>
-                  <button class="spider-btn" id="hint" type="button"
-                          aria-label="Pull the spider down to open the book">
-                    <svg class="spider" viewBox="0 0 100 100" aria-hidden="true">
-                      <defs>
-                        <radialGradient id="spBody" cx="36%" cy="28%" r="80%">
-                          <stop offset="0%"   stop-color="#6f52bb"/>
-                          <stop offset="50%"  stop-color="#33215e"/>
-                          <stop offset="100%" stop-color="#150d2e"/>
-                        </radialGradient>
-                      </defs>
-                      <!-- legs: 4 pairs, arcing out and down -->
-                      <g class="sp-legs" fill="none" stroke="#b6a2e8" stroke-width="3.6"
-                         stroke-linecap="round">
-                        <path d="M37 44 Q19 35 9 45"/>
-                        <path d="M35 52 Q14 50 6 62"/>
-                        <path d="M36 59 Q16 63 11 76"/>
-                        <path d="M39 65 Q26 75 22 87"/>
-                        <path d="M63 44 Q81 35 91 45"/>
-                        <path d="M65 52 Q86 50 94 62"/>
-                        <path d="M64 59 Q84 63 89 76"/>
-                        <path d="M61 65 Q74 75 78 87"/>
-                      </g>
-                      <!-- body: round abdomen + smaller head -->
-                      <ellipse cx="50" cy="60" rx="20" ry="18.5" fill="url(#spBody)"/>
-                      <circle cx="50" cy="39" r="11.5" fill="url(#spBody)"/>
-                      <!-- rim light so it lifts off a dark night sky -->
-                      <ellipse cx="43" cy="51" rx="11" ry="7" fill="#ffffff" opacity="0.13"/>
-                      <!-- a little gold marking, echoing the book's gold -->
-                      <path d="M50 53l2.1 5.4L57.6 60l-5.5 1.6L50 67l-2.1-5.4L42.4 60l5.5-1.6z"
-                            fill="#f6b81e" opacity="0.9"/>
-                      <!-- friendly eyes -->
-                      <circle cx="45.4" cy="37.4" r="4.1" fill="#ffffff"/>
-                      <circle cx="54.6" cy="37.4" r="4.1" fill="#ffffff"/>
-                      <circle cx="45.9" cy="38.2" r="2" fill="#1d1240"/>
-                      <circle cx="54.1" cy="38.2" r="2" fill="#1d1240"/>
-                      <circle cx="44.6" cy="36.2" r="0.9" fill="#ffffff"/>
-                      <circle cx="53.4" cy="36.2" r="0.9" fill="#ffffff"/>
-                    </svg>
-                  </button>
-                </div>
+                <!-- OPEN THE BOOK: the Play button sits on the cover artwork and
+                     tapping it swings the cover open. The artwork comes from
+                     story.js (`playButton`) and `playAt` places it, so a new story
+                     can drop in its own button over a clear part of its cover. -->
+                <button class="play-btn" id="hint" type="button"
+                        aria-label="Play — open the book">
+                  <img class="play-art" src="assets/play button.svg" alt="" draggable="false" />
+                </button>
               </div>
               <!-- BACK of the front cover: intentionally BLANK (plain dark board). -->
               <div class="face back"></div>

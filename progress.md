@@ -13,7 +13,39 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-03 (latest) — the book now opens by PULLING A HANGING SPIDER
+## 2026-08-03 (latest) — the author's own Play button; the spider is gone
+
+The author supplied **`assets/play button.svg`** (210×206 — a purple spider-web
+blob with a white ▶ and two sparkles) and asked for the pull-the-spider opening to
+be removed. So the cover is back to a single Play button, but the artwork is now
+the story's, not the engine's.
+
+- **Two story options** instead of a hard-coded orb:
+  `playButton: "assets/play button.svg"` (the artwork) and
+  `playAt: { x: "50%", y: "77%" }` (where it sits, % of the cover — the cauldron's
+  black belly again, clear of the title, both characters and the juice). The engine
+  only places, sizes and pulses it; `playAt` feeds CSS vars `--play-x/--play-y`.
+- Sized in **book px** (168px, breathing to ~180), not `vw` as the old orb was: the
+  book is a fixed 1280×720 scaled by transform, so vw sizes drift against the cover
+  as the window changes while book px keep their proportion.
+- z-index 2 → masked by `.back-fill` (z3) the instant the cover opens, same as before.
+- Opening is a plain tap again: `tapHitsPlay()` on the tap-catcher (which sits at
+  z50 over the cover, so the button never sees a mouse event), plus the button's own
+  click for keyboard. Kept the proper focus ring the spider work added.
+- **Fully removed**: `#hangZone` markup, `.hang-*`/`.spider-btn` CSS, the
+  `@property --pull` block, `spiderDangle`/`spiderTug`, and the whole PULL THE
+  SPIDER section in script.js (~120 lines: pointer capture, `pullResist`,
+  `springBack`, `snapAndOpen`, `autoPull`, the tug scheduler). Grepped clean — no
+  orphaned rules or dead handlers left.
+
+Verified: artwork loads (210×206) and sits centred on the cauldron at 720,639;
+breathes; a tap opens the book and page 1 plays; Enter on the focused button opens
+it; a tap elsewhere on the cover still does nothing; no failed loads, no errors.
+Full read-through unaffected.
+
+---
+
+## 2026-08-03 (superseded) — the book opened by PULLING A HANGING SPIDER
 
 The author's idea, replacing the gold Play orb: a spider dangles on a silk thread
 over the cover art and the reader **drags it down** to open the book.
