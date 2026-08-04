@@ -77,7 +77,9 @@
 
   /* Whole scene fades + scales in on load (entrance animation) */
   .scene {
-    width: 100%; min-height: 100svh;
+    width: 100%;
+    min-height: 100vh;    /* fallback: iOS < 15.4 drops svh and would collapse the scene */
+    min-height: 100svh;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: clamp(10px, 2.4vh, 24px);
@@ -1035,6 +1037,81 @@
   @media (prefers-reduced-motion: reduce) {
     .scene-tap-ring, .scene-tap-spot::after, .scene-tap-hand { animation: none; }
     .scene-tap-hand { transform: translate(-4%, 86%); }
+  }
+
+  /* ==========================================================================
+     POUR SCENE — the tap-to-pour interaction (see buildPourScene in script.js;
+     mechanics + timings ported from pour-interaction.md). Everything is
+     positioned in % of the page layer, so it rides the book's single
+     responsive scale untouched.
+     ========================================================================== */
+  .pour-scene .pour-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; pointer-events: none;
+  }
+  .pour-scene .pour-machine,
+  .pour-scene .pour-glass {
+    position: absolute; height: auto; pointer-events: none;
+  }
+  .pour-scene .pour-glass { overflow: visible; }
+  /* the liquid level + its surface slide via transform — 750ms ease-out rise */
+  .pour-scene .pour-level,
+  .pour-scene .pour-surface {
+    transition: transform 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
+  }
+  .pour-scene .pour-surface { transform-box: fill-box; transform-origin: center; }
+  /* THE BUTTON — artwork supplied by the story; press = shrink + darken (140ms
+     via .pressed in JS so touch matches :active). Disabled = dimmer, NEVER
+     scaled (fractional downscales blur bitmap button text — pour-interaction.md). */
+  .pour-scene .pour-btn {
+    position: absolute; border: 0; padding: 0; background: none;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s ease, filter 0.08s ease;
+  }
+  .pour-scene .pour-btn img { display: block; width: 100%; height: auto;
+                              -webkit-user-drag: none; user-drag: none; }
+  .pour-scene .pour-btn:not(:disabled):active,
+  .pour-scene .pour-btn.pressed { transform: scale(0.9); filter: brightness(0.82); }
+  .pour-scene .pour-btn:disabled {
+    cursor: default; pointer-events: none;
+    filter: saturate(0.8) brightness(0.9); opacity: 0.85;
+  }
+  .pour-scene .pour-btn:focus, .pour-scene .pour-btn:focus-visible { outline: none; }
+  /* THE STREAM — skinny gradient from the spout into the glass mouth; one-shot
+     fade-in / hold / fade-out per tap, restarted via the reflow trick. Sits
+     UNDER the glass in the DOM so its tail tucks behind the rim. */
+  .pour-scene .pour-stream {
+    position: absolute; width: 0.6%;
+    transform: translateX(-50%);
+    border-radius: 0 0 50% 50% / 0 0 14% 14%;
+    opacity: 0; pointer-events: none;
+    transform-origin: top center;
+  }
+  .pour-scene .pour-stream.pouring {
+    animation: pourStream 0.9s cubic-bezier(0.33, 0, 0.2, 1) both;
+  }
+  @keyframes pourStream {
+    0%   { opacity: 0; transform: translateX(-50%) scaleY(0.25); }
+    30%  { opacity: 1; transform: translateX(-50%) scaleY(1);    }
+    75%  { opacity: 1; transform: translateX(-50%) scaleY(1);    }
+    100% { opacity: 0; transform: translateX(-50%) scaleY(1);    }
+  }
+  /* SPLASH droplets — 5 per tap, each flung on its own vector, self-removed */
+  .pour-splash {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    animation: pourSplash 0.55s cubic-bezier(0.33, 0, 0.2, 1) forwards;
+  }
+  @keyframes pourSplash {
+    0%   { transform: translate(0, 0) scale(0.5); opacity: 0.95; }
+    60%  { opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+  }
+  /* the "tap here" ring reuses the scene-tap look; never intercepts the tap */
+  .pour-scene .pour-hint { position: absolute; pointer-events: none;
+                           transition: opacity 300ms ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .pour-scene .pour-stream.pouring { animation-duration: 0.4s; }
+    .pour-splash { animation: none; opacity: 0; }
   }
 
   /* ---- Ambient scene FX (set per scene via `fx:` in script.js) --------------

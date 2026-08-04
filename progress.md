@@ -13,7 +13,101 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-03 (latest) — bats REMOVED; responsive fit for every size
+## 2026-08-04 (latest) — page 5 part 4: the POUR mini-game (from Figma)
+
+Implemented the Figma frame **"Page 5 part 4"** (The-Glass-Half-Full-LBDs,
+node 745:508) as a FOURTH scene on page 5, with the tap-to-pour mechanic ported
+from the author's `pour-interaction.md` (the *Ready Set Serve!* reference). Flow:
+part 3's pouring clip ends → cross-dissolve to the machine with an EMPTY GLASS →
+the reader taps POUR — one shot per tap: press-in 140ms, stream 900ms one-shot,
+5 splash droplets 550ms, the liquid RISES 750ms — **4 taps to full**, then the
+button locks and the page's turn cue arms. The glass must be filled to move on.
+
+### How it's built
+- **Engine feature, story-configured**: new scene option `pour:` (story.js docs)
+  → `buildPourScene()` in script.js + a `.pour-*` CSS block. Scene player arms it
+  on landing (`layer._pourArm`), completion reports via `layer._pourDone`
+  (mid-sequence → next scene; as finale → seqDone → cue), `resetScenes` empties
+  the glass via `layer._pourReset`. No stall watchdog on purpose — it is the
+  reader's task, not a clip that can hang.
+- **The liquid is the md's SVG-clip trick**, adapted: the glass is the Figma
+  design's own vector cup (paths embedded in the engine; `assets/pages/pour/
+  glass.svg` kept as source); the juice is the cup's front-face path re-filled
+  pink, revealed by a clipPath rect that slides via **transform transition**
+  (not the `y` geometry property — transform animates everywhere, Safari
+  included). A surface ellipse rides the level, narrowing with the cup's taper
+  (scaleX). Unique clip id per build (`pour1clip…`) per the md's cloning gotcha.
+- **Geometry straight from Figma** (1920×1080 → same % in the 16:9 page):
+  machine 36.56%/11.57% w26.82%, button 46.82%/49.81% w5.78%, glass
+  47.03%/66.11% w5.94%, stream at 49.97% from 60% down 8%.
+- **Assets**: the node's raw exports had a baked WHITE matte on machine + button
+  — the `rawImages` from download_assets carry real alpha; converted via canvas
+  to webp (machine 196KB @1030px, button 24KB, bg 25KB — 268KB total vs 1.5MB
+  of first-try PNGs). *Lesson: prefer download_assets' rawImages over the node
+  export when transparency matters.*
+- md rules kept: `.pressed` mirrors `:active` for touch; disabled = dim only,
+  never scaled (bitmap text blurs); stream restart via reflow; every `play()`
+  catch-wrapped; splash divs self-remove; idle nudge re-armed after EVERY pour
+  (ring + hand reusing the scene-tap look, pointer-through, 9s idle + shown on
+  first arm since no narration introduces the button). `sound:` config wired
+  but not shipped — add `sfx/pour.mp3` and one story.js line for SFX.
+- **TDZ gotcha hit once**: buildPourScene runs at LOAD (leaf building) and used
+  `HAND_SVG`, declared later → ReferenceError killed the whole engine. The
+  constant now lives above the leaf builder. A load-order crash breaks
+  EVERYTHING (no Play, no error banner content) — first thing to suspect if the
+  book ever "won't open" after an engine edit.
+
+Verified end-to-end: parts 1-3 play → part 4 arms with ring + hand on POUR →
+ArrowRight refused mid-interaction → 4 taps: fill 25/50/75/100%, stream+splashes
+each tap, hint hides on first tap → full = button locked → cue SHOWN → leaving
+and returning resets to an empty glass at scene 1/4 → full unforced read-through
+(now pour-aware) reaches THE END, one video at a time, no errors. Screenshots
+match the Figma frame (armed / half / full).
+
+---
+
+## 2026-08-04 — "won't open on iPhone": root cause + Safari hardening
+
+### Root cause: there is no URL — iOS cannot open a local HTML file
+The book has only ever been opened by double-clicking `index.html` (file://).
+iPhones have no equivalent: tapping an .html file in the Files app / AirDrop /
+iCloud opens a QuickLook PREVIEW that runs no scripts and can't see `engine/` or
+`assets/` — so the book "won't open" on any Apple device by that route. Checked:
+the GitHub repo (harshvishnu4-cpu/Glass-half-full-flipbook, public, branch main)
+exists but **GitHub Pages is NOT enabled** — https://harshvishnu4-cpu.github.io/
+Glass-half-full-flipbook/ returns 404. **The fix is hosting, not code**: enable
+Pages (repo Settings → Pages → Deploy from a branch → main, / (root)), push, and
+open that URL in Safari. Note: enabling Pages needs the author's GitHub login.
+
+### Safari hardening done anyway (code audit — WebKit-on-Windows crashes at
+launch on this machine, so this is static analysis, not an engine run):
+- **`primeVideo` now primes UNMUTED.** Safari grants play-with-sound per element
+  only if an AUDIBLE play() ran inside a user gesture; the old muted prime earned
+  nothing (muted playback never needed permission), so page 1's real play() 5s
+  later would be refused → silent + rescue chip on every open. The synchronous
+  pause() means nothing is audibly heard during the prime; if even the audible
+  in-gesture play is refused, it falls back to the old muted prime.
+- **`min-height: 100vh` fallback** before `100svh` (.scene) — iOS < 15.4 drops
+  svh entirely and the scene would collapse.
+- Audit found NO parse-level blockers: no optional chaining / lookbehind /
+  replaceAll; AudioContext has the webkit fallback + try/catch; fullscreen is
+  guarded (iPhone has no fullscreen API — it just no-ops); videos are
+  `playsinline` + all 12 mp4s are **faststart** (moov first — verified);
+  touch-blocking only preventDefaults multi-touch, so taps still click.
+
+### NEW: on-device debug overlay — how to diagnose this in future
+Open the book with **`#debug`** on the URL (…/index.html#debug): an overlay
+panel prints the user agent, viewport, every JS error, unhandled rejection,
+console.error/warn AND failed resource loads (capture-phase error listener), on
+the device itself — no DevTools needed. Tap the panel to hide it. Zero cost when
+the hash is absent. (The red `__jsErr` crash banner still exists independently.)
+
+Regression: page 1 plays WITH sound after the prime change; overlay absent
+without the hash, catches console/promise/404s with it; full read-through clean.
+
+---
+
+## 2026-08-03 — bats REMOVED; responsive fit for every size
 
 ### Bats removed (author's call — the transition never landed)
 All three iterations are gone: the `#bats` markup, the whole BATS CSS block, the

@@ -23,6 +23,43 @@ window.addEventListener("error", function (ev) {
 console.log("%c[flipbook] loaded — 3D book, full-bleed pages, speech bubbles.",
             "font-weight:bold;color:#7d5fd0;font-size:13px");
 
+/* ---- ON-DEVICE DEBUG OVERLAY -------------------------------------------------
+   Phones have no DevTools. Open the book with  #debug  on the URL
+   (e.g.  https://…/index.html#debug ) and every error, rejected promise and
+   console.error/warn is printed in an overlay on the page itself — so an
+   iPhone-only problem can be READ on the iPhone. Costs nothing when off. */
+(function () {
+  if (window.location.hash.indexOf("debug") === -1) return;
+  var box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:0;right:0;top:0;max-height:45%;overflow:auto;" +
+    "z-index:100001;background:rgba(10,8,30,0.92);color:#9f9;padding:8px 10px;" +
+    "font:11px/1.45 monospace;white-space:pre-wrap;pointer-events:auto";
+  box.textContent = "[debug] flipbook " + new Date().toISOString() + "\n" +
+    "[debug] " + navigator.userAgent + "\n[debug] viewport " +
+    window.innerWidth + "x" + window.innerHeight + "  (tap this panel to hide)";
+  box.addEventListener("click", function () { box.style.display = "none"; });
+  function line(kind, msg) {
+    box.style.display = "";
+    box.textContent += "\n[" + kind + "] " + msg;
+    box.scrollTop = box.scrollHeight;
+  }
+  (document.body || document.documentElement).appendChild(box);
+  window.addEventListener("error", function (ev) {
+    line("error", ev.message ? ev.message + " @ " + (ev.filename || "") + ":" + ev.lineno
+                             : "resource failed: " + ((ev.target && (ev.target.src || ev.target.href)) || "?"));
+  }, true);   // capture: resource-load failures (missing video/poster/css) land here too
+  window.addEventListener("unhandledrejection", function (ev) {
+    line("promise", (ev.reason && (ev.reason.message || ev.reason)) || "rejected");
+  });
+  ["error", "warn"].forEach(function (k) {
+    var orig = console[k];
+    console[k] = function () {
+      line("console." + k, Array.prototype.slice.call(arguments).join(" "));
+      return orig.apply(console, arguments);
+    };
+  });
+})();
+
 /* ============================================================================
    ██  THE STORY LIVES IN  story.js  —  edit THAT file, not this one  ██
    ----------------------------------------------------------------------------
@@ -275,6 +312,187 @@ function makeFx(fx, layer) {
   return el;
 }
 
+/* ==========================================================================
+   POUR SCENE  —  an interactive scene: the reader taps the POUR button and
+   juice pours into a glass, one shot per tap, until it is full — then the
+   page's sequence completes and the turn cue arms. Ported from the "Ready Set
+   Serve!" pour mechanic (see pour-interaction.md): per tap —
+     press-in (140ms) · stream (900ms one-shot) · 5 splash droplets (550ms) ·
+     the liquid RISES smoothly (750ms) · optional pour sound, cut at 920ms.
+   The liquid is the classic SVG-clip trick: the juice shape is painted once
+   (a pink copy of the glass's front face) and a clipPath rectangle slides UP
+   to reveal it — animated via a transform transition, which unlike the `y`
+   geometry property animates everywhere, Safari included.
+   Config (story.js): { bg, machine, button, machineAt, buttonAt, glassAt,
+     stream:{x,top,h}, juice, taps, sound } — positions in % of the page, so
+   the whole scene rides the book's one responsive scale.
+   The scene player arms it when the scene lands (layer._pourArm), completion
+   reports back through layer._pourDone, and resetScenes calls layer._pourReset
+   so a revisit starts with an empty glass. */
+/* The pointing hand, shared by the page-turn nudge, the tap hot-spot and the
+   pour hint. Declared BEFORE the leaf builder — buildPourScene runs at load. */
+const HAND_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" ' +
+  'd="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 ' +
+  '2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 ' +
+  '4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6C13 6.67 12.33 6 11.5 6S10 ' +
+  '6.67 10 7.5v10.74l-3.44-.72c-.37-.08-.76.04-1.02.31l-1.04 1.05 5.19 ' +
+  '5.19c.28.28.66.44 1.06.44h6.78c.75 0 1.38-.55 1.49-1.29l.77-5.44c.1-.72-.29-1.42-.95-1.71z"/></svg>';
+
+let _pourSeq = 0;
+function buildPourScene(layer, cfg) {
+  const uid = "pour" + (++_pourSeq);           // cloned/multiple scenes must not share clip ids
+  const STEP = 100 / Math.max(1, cfg.taps || 4);   // default: 4 taps = a full glass
+  // The glass (from the Figma design's vector): rim ellipse over a tapering cup.
+  // Liquid = the front-face path re-filled with juice colour, clipped by #fillClip;
+  // the rim is drawn AFTER the liquid so the mouth always reads on top.
+  const juice = cfg.juice || "#F27FBE";
+  const CUP_FRONT = "M110.802 18.7536C110.802 18.7309 110.79 18.7104 110.769 18.7003C110.748 18.6896 110.725 18.6924 110.706 18.7053C102.859 24.4034 81.3011 28.2315 57.0632 28.2315C32.62 28.2315 11.0051 24.3608 3.27709 18.5993C3.25917 18.5859 3.23504 18.5838 3.21429 18.5935C3.19393 18.6033 3.18075 18.6236 3.18027 18.6462C2.74199 33.8219 5.84696 60.8215 11.6989 92.7214C16.361 118.135 21.9159 141.704 24.081 145.257C26.1417 148.642 32.4997 150.744 37.47 151.911C43.4108 153.306 50.7338 154.138 57.0584 154.138C68.9401 154.138 87.2315 151.382 90.6962 145.257C93.0902 141.025 98.2154 118.695 102.62 93.3144C107.943 62.6482 110.925 35.4717 110.802 18.7536Z";
+  const CUP_BACK  = "M113.88 14.1724C113.878 14.14 113.846 14.1086 113.818 14.1149C113.785 14.1159 113.759 14.1427 113.759 14.1755C113.759 15.7223 112.741 17.2462 110.732 18.7051C110.716 18.7162 110.707 18.7348 110.707 18.7543C110.829 35.4657 107.848 62.6342 102.527 93.2939C98.1242 118.663 93.0045 140.976 90.6178 145.196C87.1763 151.281 68.9366 154.018 57.0845 154.018C45.9934 154.018 27.8754 151.214 24.2098 145.196C22.0514 141.65 16.5042 118.101 11.8438 92.6996C5.99325 60.8075 2.88878 33.8171 3.32705 18.6489C3.32755 18.6294 3.31854 18.6108 3.30291 18.5989C1.38905 17.1722 0.418468 15.6842 0.418468 14.1755C0.418468 14.1433 0.392974 14.1166 0.360883 14.1149C0.333063 14.1157 0.300878 14.1379 0.298066 14.1699C-1.56856 33.7284 5.81325 78.6279 9.07409 97.0241C14.5699 128.033 21.2135 157.333 23.5812 161.004C25.7657 164.39 32.1125 166.418 37.0523 167.52C43.0035 168.85 50.3066 169.613 57.0889 169.613C70.7436 169.613 87.0536 166.918 90.5973 161.002C93.2207 156.622 99.4901 128.928 104.871 97.9538C107.954 80.2061 115.004 36.5139 113.88 14.1724Z";
+  const CUP_RIM   = "M97.2109 4.13631C86.4913 1.46885 72.2396 0 57.0812 0C41.9235 0 27.6718 1.46923 16.9523 4.13631C6.20722 6.81009 0.290068 10.3758 0.290068 14.1771C0.290068 15.7257 1.27674 17.2467 3.22312 18.6973C10.97 24.4729 32.6142 28.3535 57.0812 28.3535C81.343 28.3535 102.93 24.5158 110.795 18.8041C112.837 17.3212 113.872 15.7646 113.872 14.1771C113.872 10.3758 107.956 6.81009 97.2109 4.13631Z";
+  const CUP_MOUTH = "M19.096 21.0888C29.2388 23.1466 42.7238 24.2803 57.0671 24.2803C71.4102 24.2803 84.8951 23.1466 95.0377 21.0888C105.208 19.0249 110.81 16.2689 110.81 13.3273C110.81 10.3858 105.208 7.62922 95.0377 5.56567C84.8951 3.50767 71.41 2.37404 57.0671 2.37404C42.7238 2.37404 29.2388 3.50767 19.096 5.56567C8.92507 7.62922 3.32394 10.3858 3.32394 13.3273C3.32394 16.2689 8.92507 19.0249 19.096 21.0888Z";
+  const TOP_Y = 33, BOT_Y = 152;               // liquid surface y at 100% / 0% (cup space)
+  const at = function (o, dw) {                // config position → inline % styles
+    return "left:" + (o && o.x || "0%") + ";top:" + (o && o.y || "0%") +
+           ";width:" + (o && o.w || dw) + ";";
+  };
+  const st = cfg.stream || {};
+  layer.classList.add("pour-scene");
+  layer.innerHTML =
+    '<img class="pour-bg" alt="" draggable="false" src="' + encodeURI(cfg.bg || "") + '">' +
+    '<img class="pour-machine" alt="" draggable="false" style="' + at(cfg.machineAt, "27%") + '" src="' + encodeURI(cfg.machine || "") + '">' +
+    '<div class="pour-stream" style="left:' + (st.x || "50%") + ";top:" + (st.top || "60%") +
+        ";height:" + (st.h || "8%") + ';background:linear-gradient(180deg,' +
+        juice + '00 0%,' + juice + ' 22%,' + juice + ' 100%)"></div>' +
+    '<svg class="pour-glass" style="' + at(cfg.glassAt, "6%") + '" viewBox="0 0 114 169.613" aria-hidden="true">' +
+      '<defs><clipPath id="' + uid + 'clip">' +
+        '<rect class="pour-level" x="0" y="0" width="114" height="169.613" style="transform:translateY(' + BOT_Y + 'px)"/>' +
+      '</clipPath></defs>' +
+      '<path d="' + CUP_BACK + '" fill="#DFDAD0"/>' +
+      '<path d="' + CUP_FRONT + '" fill="#EAE7E0"/>' +
+      '<g clip-path="url(#' + uid + 'clip)">' +
+        '<path d="' + CUP_FRONT + '" fill="' + juice + '"/>' +
+      '</g>' +
+      '<ellipse class="pour-surface" cx="57" cy="0" rx="52" ry="7" fill="' + juice + '" ' +
+        'style="filter:brightness(1.18);transform:translateY(' + BOT_Y + 'px) scaleX(0.64);opacity:0"/>' +
+      '<path d="' + CUP_RIM + '" fill="#F8FBF6"/>' +
+      '<path d="' + CUP_MOUTH + '" fill="#DFDAD0"/>' +
+    '</svg>' +
+    '<button class="pour-btn" type="button" disabled aria-label="Pour the juice" ' +
+        'style="' + at(cfg.buttonAt, "6%") + '">' +
+      '<img alt="" draggable="false" src="' + encodeURI(cfg.button || "") + '">' +
+    '</button>' +
+    // the "tap here" ring + hand, reusing the scene-tap look (pointer-through);
+    // centred on the BUTTON: x + w/2 across, and half the button's height down
+    // (the art is roughly square, so w/2 of the PAGE ≈ h/2 once aspect-corrected
+    // by the 16:9 page box — close enough for a hint that only says "look here")
+    '<span class="scene-tap-spot pour-hint" style="left:' +
+        (parseFloat(cfg.buttonAt && cfg.buttonAt.x || 47) + parseFloat(cfg.buttonAt && cfg.buttonAt.w || 6) / 2).toFixed(2) +
+        "%;top:" +
+        (parseFloat(cfg.buttonAt && cfg.buttonAt.y || 50) + parseFloat(cfg.buttonAt && cfg.buttonAt.w || 6) * 16 / 18).toFixed(2) +
+        '%;--spot:112px;opacity:0">' +
+      '<span class="scene-tap-ring"></span>' +
+      '<span class="scene-tap-hand">' + HAND_SVG + "</span>" +
+    "</span>";
+
+  const btn     = layer.querySelector(".pour-btn");
+  const streamEl= layer.querySelector(".pour-stream");
+  const levelEl = layer.querySelector(".pour-level");
+  const surfEl  = layer.querySelector(".pour-surface");
+  const hintEl  = layer.querySelector(".pour-hint");
+  const sound   = cfg.sound ? new Audio(encodeURI(cfg.sound)) : null;
+  if (sound) sound.preload = "auto";
+
+  let fillPct = 0, complete = false, timers = [], idleTimer = null;
+  const wait = function (fn, ms) { timers.push(setTimeout(fn, ms)); };
+  const showHint = function (on) { if (hintEl) hintEl.style.opacity = on ? "1" : "0"; };
+  function armIdleHint() {                     // md: re-arm after EVERY pour, so the
+    clearTimeout(idleTimer);                   // window always measures true idleness
+    idleTimer = setTimeout(function () {
+      if (!complete && !btn.disabled) showHint(true);
+    }, 9000);
+  }
+  function setJuice(pct) {
+    const f = Math.max(0, Math.min(1, pct / 100));
+    const y = BOT_Y - f * (BOT_Y - TOP_Y);
+    levelEl.style.transform = "translateY(" + y.toFixed(1) + "px)";
+    // the surface ellipse rides the level; the cup tapers, so it narrows going down
+    const k = 0.64 + 0.36 * ((BOT_Y - y) / (BOT_Y - TOP_Y));
+    surfEl.style.transform = "translateY(" + y.toFixed(1) + "px) scaleX(" + k.toFixed(3) + ")";
+    surfEl.style.opacity = f > 0.01 ? "1" : "0";
+  }
+  function pour() {
+    if (complete || btn.disabled || fillPct >= 100) return;
+    showHint(false);
+    armIdleHint();
+    btn.classList.add("pressed");              // touch gets the same feedback as :active
+    wait(function () { btn.classList.remove("pressed"); }, 140);
+    if (sound) {                               // every play() catch-wrapped (autoplay policies)
+      try { sound.currentTime = 0; var p = sound.play(); if (p && p.catch) p.catch(function () {}); } catch (_) {}
+    }
+    streamEl.classList.remove("pouring");      // restart pattern: works mid-animation
+    void streamEl.offsetWidth;
+    streamEl.classList.add("pouring");
+    wait(function () {
+      streamEl.classList.remove("pouring");
+      if (sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
+    }, 920);
+    spawnSplash();
+    fillPct = Math.min(fillPct + STEP, 100);
+    setJuice(fillPct);
+    if (fillPct >= 100) {                      // full = locked, permanently (allowPour rule)
+      complete = true;
+      btn.disabled = true;
+      clearTimeout(idleTimer);
+      // let the stream fade + the liquid finish rising, hold the full glass a
+      // beat, THEN hand the page back to the scene player (turn cue arms).
+      wait(function () { if (layer._pourDone) layer._pourDone(); }, 1500);
+    }
+  }
+  function spawnSplash() {                     // 5 throwaway droplets at the mouth
+    const gx = parseFloat(cfg.glassAt && cfg.glassAt.x || 47),
+          gw = parseFloat(cfg.glassAt && cfg.glassAt.w || 6),
+          gy = parseFloat(cfg.glassAt && cfg.glassAt.y || 66);
+    for (let i = 0; i < 5; i++) {
+      const d = document.createElement("div");
+      d.className = "pour-splash";
+      d.style.background = juice;
+      const sz = 6 + Math.random() * 8;        // book px (the layer scales with the book)
+      d.style.width = d.style.height = sz.toFixed(0) + "px";
+      d.style.left = (gx + gw * (0.3 + Math.random() * 0.4)) + "%";
+      d.style.top  = (gy + 1 + Math.random() * 2) + "%";
+      d.style.setProperty("--dx", ((Math.random() * 2 - 1) * 40).toFixed(0) + "px");
+      d.style.setProperty("--dy", (-(18 + Math.random() * 28)).toFixed(0) + "px");
+      layer.appendChild(d);
+      timers.push(setTimeout(function () { d.remove(); }, 560));
+    }
+  }
+  btn.addEventListener("click", function (e) { e.stopPropagation(); pour(); });
+
+  layer._pourArm = function () {               // the scene has landed → the reader may pour
+    if (complete) { if (layer._pourDone) layer._pourDone(); return; }
+    btn.disabled = false;
+    showHint(true);                            // no narration introduces POUR — the ring does
+    armIdleHint();
+  };
+  layer._pourReset = function () {             // leaving the page → empty glass next visit
+    timers.forEach(clearTimeout); timers = [];
+    clearTimeout(idleTimer);
+    fillPct = 0; complete = false;
+    btn.disabled = true;
+    btn.classList.remove("pressed");
+    streamEl.classList.remove("pouring");
+    showHint(false);
+    if (sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
+    layer.querySelectorAll(".pour-splash").forEach(function (d) { d.remove(); });
+    const t = levelEl.style.transition, t2 = surfEl.style.transition;
+    levelEl.style.transition = "none"; surfEl.style.transition = "none";   // reset without a visible drain
+    setJuice(0);
+    void layer.offsetWidth;
+    levelEl.style.transition = t; surfEl.style.transition = t2;
+  };
+}
+
 /* ---- Build the pages (one CSS 3D "leaf" per entry) ---------------------- */
 const flipbookEl  = document.getElementById("flipbook");
 const pageStackEl = flipbookEl ? flipbookEl.querySelector(".page-stack") : null;   // right-side page stack
@@ -325,6 +543,11 @@ pages.forEach(function (page, i) {
     page.scenes.forEach(function (sc, si) {
       const layer = document.createElement("div");
       layer.className = "page-scene" + (si === 0 ? " on" : "");
+      if (sc.pour) {                           // interactive POUR scene (no media src)
+        buildPourScene(layer, sc.pour);
+        front.appendChild(layer);
+        return;
+      }
       const isVideo = /\.(mp4|webm)$/i.test(sc.src);
       layer.appendChild(makeMedia({ type: isVideo ? "video" : "image", src: sc.src, alt: sc.alt }));
       if (sc.fx) {
@@ -920,9 +1143,19 @@ function primeVideo(i) {
   if (!v || v.dataset.primed) return;
   v.dataset.primed = "1";
   try {
-    v.muted = true; v.preload = "auto";
+    v.preload = "auto";
+    // Prime UNMUTED: Safari grants each media element its play-with-sound right
+    // only if an AUDIBLE play() happened inside a user gesture — a muted prime
+    // earns nothing there (muted playback never needed permission), so the real
+    // play() seconds later was rejected and the page fell back to silent + the
+    // rescue chip. The synchronous pause() means nothing is actually heard.
+    v.muted = false;
     const p = v.play();                       // start within the gesture → element is "activated"
-    if (p && p.catch) p.catch(function () {});
+    if (p && p.catch) p.catch(function () {
+      // Even the in-gesture audible play was refused (strict autoplay settings) —
+      // take the muted activation as a consolation so at least video runs.
+      try { v.muted = true; v.play().catch(function () {}); v.pause(); } catch (_) {}
+    });
     v.pause();                                // pause synchronously
     v.currentTime = 0;
   } catch (_) {}
@@ -1071,6 +1304,7 @@ function resetScenes(leaf) {                   // back to scene 0, bubbles + vid
   clearSceneTap();                             // drop a pending "tap to continue"
   leaf.querySelectorAll(".page-scene").forEach(function (l, i) {
     l.classList.toggle("on", i === 0);
+    if (l._pourReset) l._pourReset();          // empty the glass for the next visit
     const b = l.querySelector(".bubble");
     if (b) resetBubble(b);
     l.querySelectorAll(".scene-tap").forEach(function (t) { t.remove(); });   // stray hot-spot
@@ -1085,15 +1319,6 @@ function resetScenes(leaf) {                   // back to scene 0, bubbles + vid
     }
   });
 }
-
-/* The pointing hand, shared by the page-turn nudge and the in-page tap spot. */
-const HAND_SVG =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" ' +
-  'd="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 ' +
-  '2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 ' +
-  '4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6C13 6.67 12.33 6 11.5 6S10 ' +
-  '6.67 10 7.5v10.74l-3.44-.72c-.37-.08-.76.04-1.02.31l-1.04 1.05 5.19 ' +
-  '5.19c.28.28.66.44 1.06.44h6.78c.75 0 1.38-.55 1.49-1.29l.77-5.44c.1-.72-.29-1.42-.95-1.71z"/></svg>';
 
 /* ---- INTERACTIVE SCENE: "tap to continue" --------------------------------
    A scene with `tap:` in story.js does NOT advance on its own. Its clip plays
@@ -1193,7 +1418,12 @@ function playScenes(idx, startDelay) {
         armSceneTap(layer, sc.tap, goNextScene);
       };
       const advance = (sc && sc.tap) ? armTap : goNextScene;
-      if (sc && sc.tap && sc.tap.after != null) {
+      if (sc && sc.pour) {
+        // POUR scene mid-sequence: the READER finishes it — no timers, no video.
+        layer._pourDone = goNextScene;                    // full glass → next scene
+        sceneWait(function () { if (layer._pourArm) layer._pourArm(); },
+                  revealDelay + 250);                     // arm once the dissolve lands
+      } else if (sc && sc.tap && sc.tap.after != null) {
         // `tap.after` — arm the hot-spot partway INTO the clip (once its narration
         // is over) rather than at the very end, so the reader isn't left waiting
         // through a silent, still tail. Tapping then cuts the clip short.
@@ -1218,7 +1448,14 @@ function playScenes(idx, startDelay) {
         sceneSeqDone = idx;                    // remember: this page has played out
         dialogueDone(idx);
       };
-      if (vid && (!sc || sc.hold == null)) {
+      if (sc && sc.pour) {
+        // POUR scene as the page's FINALE: the full glass is what completes the
+        // page — seqDone then arms the turn cue. Deliberately NO stall watchdog:
+        // this is the reader's task, not a clip that can hang.
+        layer._pourDone = seqDone;
+        sceneWait(function () { if (layer._pourArm) layer._pourArm(); },
+                  revealDelay + 250);
+      } else if (vid && (!sc || sc.hold == null)) {
         vid._sceneAdv = seqDone;               // resetScenes cleans this up too
         vid.addEventListener("ended", seqDone, { once: true });
         vid.addEventListener("error", seqDone, { once: true });   // can't play → still let them turn

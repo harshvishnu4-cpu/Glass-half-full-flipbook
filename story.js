@@ -30,6 +30,13 @@
                        reader isn't left waiting with nothing to do.
                 label— what a screen reader announces
        bubble : optional speech bubble (below).
+       pour   : an INTERACTIVE scene instead of src — the reader taps a POUR
+                button to fill a glass, one shot per tap; the page can only be
+                turned once the glass is full. See PAGE 5 below for a live
+                example with every field. Fields: bg / machine / button (image
+                paths), machineAt / buttonAt / glassAt ({x,y,w} in % of the
+                page), stream ({x,top,h}), juice (colour), taps (to fill,
+                default 4), sound (optional pour SFX path).
 
    • A single-image page (no scenes):  { type:"image", src, bubble }
      A single-video page:              { type:"video", src, delay }
@@ -98,6 +105,22 @@ window.STORY = {
           tap: { after: 4800, at: { x: "46.7%", y: "53.5%" }, size: 150,
                  label: "Tap the POUR button to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
+        // ── PART 4: POUR A GLASS (interactive — Figma "Page 5 part 4") ─────
+        // The machine holds the juice; the reader taps POUR to fill the glass,
+        // one shot per tap, 4 taps to the brim. The page can only be turned
+        // once the glass is FULL. Positions are % of the page (from the Figma
+        // frame). Add  sound: "sfx/pour.mp3"  here if a pour SFX is added.
+        { pour: {
+            bg:      "assets/pages/pour/bg.webp",
+            machine: "assets/pages/pour/machine.webp",
+            button:  "assets/pages/pour/pour-button.webp",
+            machineAt: { x: "36.56%", y: "11.57%", w: "26.82%" },
+            buttonAt:  { x: "46.82%", y: "49.81%", w: "5.78%"  },
+            glassAt:   { x: "47.03%", y: "66.11%", w: "5.94%"  },
+            stream: { x: "49.97%", top: "60%", h: "8%" },
+            juice: "#F27FBE",
+            taps: 4,
+        } },
     ] },
 
     { type: "video", src: "assets/pages/Page 6.mp4"  },   // 17s
