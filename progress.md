@@ -13,7 +13,40 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-04 (latest) — "the book starts in the middle": bookmark-resume rethought
+## 2026-08-04 (latest) — narration starts at ~1.8s; persistence removed for good
+
+Two author reports, both fixed:
+
+### 1. "No audio when the book opens feels awkward"
+The video (and its narration) waited for 84% of the 6s cover swing (~5.1s of
+music-only dead air). **Measured the swing** (coverangle.js): its ease is so
+front-loaded that the cover passes 90° (page fully visible) at **0.75s** and is
+visually flat (~165°) by **2s** — everything after is an imperceptible settle.
+The media gate now opens at **28% (~1.7s)**; measured result: narration starts
+**1.82s** after the tap with the cover at 158°, fully clear of the page. `ready`
+(flip unlock + cover parking) still waits for the full 6s swing.
+
+### 2. "Some pages can be turned before the clip ends" (looked like random glitching)
+Cause: the previous fix persisted the WATCHED set across sessions — pages watched
+in an earlier sitting unlocked instantly on revisit, unwatched ones gated, and the
+mix read as broken. That was the SECOND time localStorage state read as a bug
+("starts in the middle" was the first). **Persistence is now removed entirely**
+(no PROGRESS_KEY/save/load): every open is a fresh, fully-gated read from page 1;
+`videoWatched` is session-only, so back-and-forth within one read stays instant.
+If resume is ever wanted, build it as explicit UI (a "Continue?" choice), never
+silent state. Old builds' leftover storage keys are simply ignored.
+
+Also hardened `armTurnCue`: "stuck" now requires no-playback-PROGRESS as well as
+bad element state, so a slow connection that dips readyState while still crawling
+forward can never unlock a page mid-story (the 5s true-freeze escape remains).
+
+Verified: narration at 1.82s with sound; a planted old-format bookmark is ignored
+(page 1, gated); page 1 gated while playing on a dirty profile; full unforced
+read-through clean.
+
+---
+
+## 2026-08-04 (earlier) — "the book starts in the middle": bookmark-resume rethought
 
 The author reported the book opening mid-story. Root cause: the UX pass's
 bookmark-resume WORKING — their browser held a real bookmark from a half-finished

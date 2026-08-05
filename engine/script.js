@@ -150,7 +150,6 @@ function makeMedia(page) {
         if (!layer || layer !== layers[layers.length - 1]) return;
       } else {
         videoWatched[flipped] = true;            // seen in full → never re-gate it
-        saveProgress();                          // the bookmark remembers it was watched
         dialogueDone(flipped);
       }
       if (flipped >= totalPages - 1) return;     // last page → nothing to turn to
@@ -1375,13 +1374,18 @@ function armTurnCue(v, idx) {
   if (turnCueIdx === idx && turnCueTimer) return;          // already watching this page
   stopTurnCue();
   turnCueIdx = idx;
-  let stuck = 0;
+  let stuck = 0, lastT = -1;
   turnCueTimer = setInterval(function () {
     if (flipped !== idx || hintDoneFor === idx) { stopTurnCue(); return; }  // left, or already armed
     if (v.error || v.ended) { stopTurnCue(); dialogueDone(idx); return; }
     const counting = mediaDelayTimer && mediaDelayIdx === idx;   // a `delay` countdown is not "stuck"
-    stuck = (!counting && (v.paused || v.readyState < 3)) ? stuck + 1 : 0;
-    if (stuck >= 5) { stopTurnCue(); dialogueDone(idx); }        // ~5s of nothing → let them turn
+    // "Stuck" needs BOTH an unhealthy element state AND no playback progress: a
+    // clip buffering on a slow connection dips readyState while still crawling
+    // forward — that must never unlock the page mid-story.
+    const advanced = v.currentTime > lastT + 0.05;
+    lastT = v.currentTime;
+    stuck = (!counting && !advanced && (v.paused || v.readyState < 3)) ? stuck + 1 : 0;
+    if (stuck >= 5) { stopTurnCue(); dialogueDone(idx); }        // ~5s truly frozen → let them turn
   }, 1000);
 }
 function stopTurnCue() {
@@ -1397,12 +1401,7 @@ function refreshMedia() {
     lastMediaIdx = idx; armBlink = true;       // arm the video-end blink once per page
     hintDoneFor = -1;                          // fresh page → nudge waits for its scenes again
     hideSoundHint(null);                       // the muted-clip rescue belongs to the page we left
-    if (idx >= totalPages - 1) {
-      clearProgress();                         // reached THE END → next open starts fresh
-      duckMusic(false);                        // no narration here — let the music carry the page
-    } else {
-      saveProgress();                          // bookmark every landing
-    }
+    if (idx >= totalPages - 1) duckMusic(false);   // no narration on THE END — music carries it
   }
   // Left the page a delayed video was counting down on? Cancel that countdown.
   if (mediaDelayTimer && mediaDelayIdx !== idx) {
@@ -1604,7 +1603,6 @@ function runOpenSequence() {
   bookFloat.classList.add("rest");     // stop the idle bob
   coverScene.classList.remove("parked");
   flipbookEl.style.zIndex = "";        // cover ABOVE the pages while it swings open
-  applyResume();                       // unlock previously watched pages (start stays page 1)
   keepAwake();                         // hands-off story → the screen must not sleep
   // Reveal the REAL page right away (it sits beneath the cover, masked by it).
   flipbookEl.classList.add("show");
@@ -1615,17 +1613,19 @@ function runOpenSequence() {
   playBgMusic();                        // start the looping background music
   primeVideo(flipped); primeVideo(flipped + 1);   // unlock the landing page + next inside the gesture
   refreshMedia();                       // buffer + hold the landing page on its first frame
-  // Page 1's clip starts as soon as the cover is VISUALLY FLAT — the coverOpen
-  // keyframes hit -180.4deg at 84%, and the last 16% is a 0.4deg settle nobody can
-  // see. Waiting for the whole animation left ~1s of dead air on a page the reader
-  // was already looking at. (`ready`, which unlocks flips, still waits for the
-  // full swing — only playback moves earlier.)
+  // Page 1's clip starts as soon as the cover has CLEARED the page — measured:
+  // the swing's ease is so front-loaded that the cover passes 90° (page fully
+  // visible) at ~0.75s and is visually flat (~165°) by ~2s; everything after is
+  // an imperceptible settle. Waiting longer was 3+ seconds of silent dead air —
+  // "the book feels awkward" — so the gate opens at 28% (~1.7s, cover ~155°,
+  // fully off the page). (`ready`, which unlocks flips and parks the cover,
+  // still waits for the full swing — only playback moves earlier.)
   clearTimeout(_mediaGateTimer);
   mediaGate = false;
   _mediaGateTimer = setTimeout(function () {
     mediaGate = true;
     refreshMedia();
-  }, Math.round(COVER_OPEN_MS * 0.84));
+  }, Math.round(COVER_OPEN_MS * 0.28));
   // Once the cover has FULLY opened, park it, lift the pages above it, hand over
   // pointer events, and mark the book READY.
   clearTimeout(_openTimer);
@@ -1687,7 +1687,6 @@ function resetToStart() {
   stopTurnCue();                               // no watchdog running behind the cover
   hideSoundHint(null);
   releaseWake();                               // closed book → the screen may sleep again
-  clearProgress();                             // closing to the cover IS choosing a fresh read
   try { bgMusic.pause(); bgMusic.currentTime = 0; bgMusic.volume = BG_VOL; } catch (_) {}   // stop music, un-ducked for next Play
   updateProgress();                            // re-sync nav state (arrows greyed)
 }
@@ -2057,40 +2056,15 @@ document.addEventListener("visibilitychange", function () {
   if (!document.hidden) keepAwake();           // hides always drop the lock — take it back
 });
 
-/* ---- REMEMBER WHAT'S BEEN WATCHED ---------------------------------------------
-   Every clip is watch-to-the-end gated, so losing your place is EXPENSIVE: a
-   refresh on page 7 used to mean sitting through six clips again to get back.
-   The set of watched pages is saved as the reader goes; on the next open the
-   book still starts at PAGE 1 (an earlier version jumped straight to the saved
-   page, which read as "the book starts in the middle" — a bug report, not a
-   feature), but every previously watched page's turn cue unlocks the moment it
-   is revisited — so getting back to where you were is a few quick taps, not a
-   re-watch. Finishing the story (THE END) or tapping Replay clears the memory —
-   a fresh read is a deliberate act, and it gates afresh.
-   Keyed by the story's cover path, so two different books served from the same
-   origin don't inherit each other's state. localStorage can be unavailable
-   (privacy modes) — every touch is try/caught; the feature just disappears. */
-const PROGRESS_KEY = "flipbook-progress:" + (STORY.cover || "default");
-function saveProgress() {
-  try {
-    const watched = Object.keys(videoWatched).map(Number);
-    if (!watched.length || flipped >= totalPages - 1) { localStorage.removeItem(PROGRESS_KEY); return; }
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify({ watched: watched }));
-  } catch (_) {}
-}
-function clearProgress() {
-  try { localStorage.removeItem(PROGRESS_KEY); } catch (_) {}
-}
-/* Restore the watched set (never the position — the book always opens on page 1). */
-function applyResume() {
-  try {
-    const s = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "null");
-    if (!s) return;
-    (s.watched || []).forEach(function (i) {
-      if (i >= 0 && i < totalPages - 1) videoWatched[i] = true;
-    });
-  } catch (_) {}
-}
+/* ---- (No cross-session persistence, on purpose.) ------------------------------
+   Two attempts at remembering progress in localStorage both read as BUGS to the
+   author: resuming at the saved page = "the book starts in the middle", and
+   restoring the watched set = "some pages can be turned before the clip ends"
+   (previously-watched pages unlocked instantly, others didn't — looked random).
+   The rule now: every OPEN is a fresh, fully-gated read; `videoWatched` lives
+   only for the session, so flipping BACK during one read stays instant. If a
+   future story needs real resume, make it explicit UI (a "Continue?" choice on
+   the cover), never silent state. */
 
 /* ---- Pause ALL audio when the tab / window goes to the background -----------
    Background music AND the current page's video (its voice-over) must stop the

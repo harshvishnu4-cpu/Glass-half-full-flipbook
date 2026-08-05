@@ -150,10 +150,9 @@ engine/           ← ⚙ the book itself — do NOT edit
 ```
 
 ## How the book behaves (built-in UX)
-- **It remembers what's been watched.** The book always opens at page 1, but
-  pages already watched in an earlier sitting don't re-lock — getting back to
-  where you were is a few quick taps, not a re-watch. Finishing the story or
-  pressing *Read again* starts completely fresh.
+- **Every open is a fresh read.** The book always starts at page 1 with every
+  page gated, no matter what happened last time. Within one sitting, pages
+  already watched don't re-lock, so flipping back and forth is instant.
 - **The music ducks under narration** and swells back between pages.
 - **If the browser blocks sound**, the page plays silently and a small "Tap the
   page for sound" chip appears — one tap fixes it.
