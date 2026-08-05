@@ -980,18 +980,22 @@ let mediaDelayIdx = -1;       // which page that pending timer belongs to
 let lastMediaIdx = -1;        // last page refreshMedia handled (to arm the blink once)
 let armBlink = false;         // allow the video-end arrow blink ONCE per page arrival
 
-/* Start (or resume) a page's clip. `restartIfEnded` is the guard against replaying
-   a page the reader has already watched: refreshMedia() is called several times per
-   turn as an idempotent safety net (flip start, flip end, a drag that snapped back),
-   and play() on a FINISHED element seeks back to 0 — so those re-asserts would
-   restart a clip the reader had just finished. Only a fresh arrival on the page
-   (or a scene landing) replays it. */
-function playVideoNow(v, restartIfEnded) {
+/* Start (or resume) a page's clip. `restart` distinguishes a fresh ARRIVAL on the
+   page from the idempotent re-asserts refreshMedia() makes several times per turn
+   (flip start, flip end, a drag that snapped back):
+     • restart=true  (the reader just navigated here, back OR forward, or a scene
+       landed): the clip plays FROM THE TOP — a page you return to mid-clip must
+       not resume from wherever it was paused, it tells its story again.
+     • restart=false (re-assert): a playing clip is left alone and a finished one
+       stays finished — play() on an ended element seeks to 0 by spec, which is
+       how a corner-tap once replayed a page the reader had just watched. */
+function playVideoNow(v, restart) {
   try {
     v.preload = "auto";                       // make sure it's buffering before we play
-    if (v.ended) {
-      if (!restartIfEnded) return;            // finished, and we're only re-asserting → leave it
-      v.currentTime = 0;
+    if (restart) {
+      if (v.currentTime > 0.05) v.currentTime = 0;   // from the top, always
+    } else if (v.ended) {
+      return;                                 // finished, and we're only re-asserting → leave it
     }
     v.muted = false;                          // try WITH sound (primed in the Play gesture)
     duckMusic(true);                          // narration up front, music underneath

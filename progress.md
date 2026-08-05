@@ -13,7 +13,23 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-04 (latest) — narration starts at ~1.8s; persistence removed for good
+## 2026-08-04 (latest) — navigating to a page always restarts its clip
+
+Author report: going BACK to a page mid-clip resumed the video from where it had
+paused instead of restarting. `playVideoNow(v, restart)` semantics tightened: a
+fresh ARRIVAL on a page (back or forward, or a scene landing) now seeks to 0
+before playing — a revisited page always tells its story from the top. The
+re-assert path (`restart=false`, called repeatedly during each turn) still leaves
+a playing clip alone and a finished clip finished, so the corner-tap-replay bug
+stays fixed (regression-tested in the same run).
+
+Verified: page 2 paused at 4.6s → back → page 1 restarts from ~0 → forward →
+page 2 restarts from ~0; corner tap on a finished page still does not replay;
+full unforced read-through clean.
+
+---
+
+## 2026-08-04 (earlier) — narration starts at ~1.8s; persistence removed for good
 
 Two author reports, both fixed:
 
