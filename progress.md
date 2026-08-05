@@ -13,7 +13,104 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-04 (latest) — page 5 part 4: the POUR mini-game (from Figma)
+## 2026-08-04 (latest) — "the book starts in the middle": bookmark-resume rethought
+
+The author reported the book opening mid-story. Root cause: the UX pass's
+bookmark-resume WORKING — their browser held a real bookmark from a half-finished
+read, so every open jumped to the saved page. All headless tests cleared
+localStorage first, which is exactly why it never showed up here. *Lesson: a
+persistence feature must be tested with a DIRTY profile, not just a clean one.*
+
+Fix — keep the medicine, drop the surprise:
+- **The book now ALWAYS opens at page 1.** `applyResume()` no longer touches
+  `flipped`; the saved `page` field is gone (old-format saves are read
+  compatibly and simply ignored beyond their watched list).
+- **The watched set still persists** (`{watched:[…]}`): previously watched pages
+  unlock the moment they're revisited, so returning to page 7 is six quick taps
+  instead of six re-watched clips. Fresh readers (no storage) are fully gated;
+  THE END and Replay still clear everything.
+- The `body.no-anim` leaf rule + silent pre-pose in applyResume were only for the
+  position jump — removed.
+
+Verified: an old-format bookmark ({page:6}) now opens on page 1 with pages 1-4
+instantly turnable; a clean profile stays fully gated; watching page 1 then
+reloading gives page 1 with its cue immediate; full read-through clean.
+
+### Same session, earlier: dead-code purge + abuse fuzz (author-requested QA)
+- **Removed the entire dormant LBD/"Stairway Shuffle" system** (~180 lines JS:
+  makeMedia's lbd branch, LBD_INDEX, the overlay section incl. postMessage
+  listener, every lbdFullscreen/updateLbdOverlay/positionLbdStage reference) —
+  its #lbdStage/#lbdFrame elements haven't existed in this build's markup at all.
+- **Removed the legacy hidden #prev/#next buttons** (markup, consts, listeners,
+  updateProgress lines) — the corner arrows are the real controls.
+- **Removed ~120 lines of orphaned CSS**: .lbd-stage block, both .arrow blocks,
+  .page-base, .bookplate, .end-note (+.book.at-end), .cover .title/.subtitle/
+  .cover-photo(+.tape) blocks and their hide rule, .cover .front .fore-edge,
+  .cover .back .line/.name-line, #leaves. Verified with a selector-vs-usage
+  scanner (scratchpad orphans2.js); the one remaining flag, `.fx-scan`, is a
+  FALSE positive — fx classes are built dynamically as "fx-" + type. Stale
+  "25 videos" comments updated.
+- **Abuse fuzz, all clean** (scratchpad fuzz.js): Play-button mash opens once;
+  6-click arrow mash = exactly one turn; alternating arrows; grabbing the page
+  mid peel-tween (no stuck leaf, no leftover clip-path); a resize storm mid-flip;
+  tab hide/show mid-video; Read-again mashed 4× closes once and the next read is
+  fresh; arrow keys during the cover swing are refused. Mid-peel screenshot
+  geometry correct; responsive matrix + full unforced read-through re-passed
+  after the purge.
+
+---
+
+## 2026-08-04 (earlier) — "misaligned pages": verified original, then rebalanced
+
+The author asked why the pages were misaligned (page sits left-of-centre in the
+book frame). **Verified NOT a regression** before touching anything: rendered the
+repo's first full commit (8f7a028, before every change this session) at the same
+viewport — pixel-identical geometry (leaf [192,108,1536,864], frame
+[173,89,1606,902]). It is the template's original book anatomy: page block flush
+to the SPINE (left, 16px board), fore-edge (.page-stack, the pages still to be
+turned) on the right under a wider 42px board.
+
+The real problem: the paper sheets only reach ~21px past the page edge, so the
+-42px frame left **~21px of bare dark board between paper and frame edge** — and
+that gap is what read as "misaligned" rather than as book anatomy. Fix (author
+chose "paper hugs the page" over centring or leaving it): `.book-frame` right
+inset **-42px → -27px**, leaving a 6px board edge past the deepest sheet. Left/
+top/bottom untouched; the fore-edge still thins page by page (data-count) and
+the closed cover was never affected (frame is is-open only).
+
+*Method note for future "why did X change?" questions: `git worktree add <tmp>
+<old-commit>` + screenshot both versions at the same viewport BEFORE explaining.
+Also: this repo's "first commit" is only the README stub — the project baseline
+is "second commit" (8f7a028).*
+
+---
+
+## 2026-08-04 (earlier) — pour SFX + part 2's cue is now "tap anywhere"
+
+- **Pour SFX wired.** The author added `sfx/pour.ogg` (4.68s stereo) — but .ogg
+  is SILENT on Safari/iOS (the exact platform just fixed), so it was converted
+  in-browser (decodeAudioData → OfflineAudioContext → 16-bit mono WAV) to
+  **`sfx/pour.wav`** (403KB, plays everywhere); the .ogg stays as the source.
+  `sound: "sfx/pour.wav"` on the pour config → per tap: rewind + play, hard-stop
+  at 920ms as the stream fades (the md's cutoff — only the first ~0.9s of the
+  4.7s file is ever heard). Conversion recipe: `ogg2wav.js` in the scratchpad.
+- **Part 2's cue no longer points at the POUR button** (author request: "tap
+  the screen anywhere, not on the pour button" — button-pressing is part 4's
+  job, and a ring on the machine's button taught the wrong thing one scene
+  early). New `tap.anywhere: true` option: the targeting ring AND ripple circle
+  are hidden, leaving a big tapping hand placed via `at` on open space
+  (27%, 62% — empty wood left of the machine), label "Tap the screen…". The
+  full-page hit area is unchanged — a tap anywhere always advanced; the hint
+  now says so instead of contradicting it.
+- `layer._pourSound` exposed for headless tests.
+
+Verified: part-2 cue shows hand-only (ring display:none), 150px+ from the
+button, tap at a random far corner advances; part-4 tap → pour.wav playing at
+t=0.02, stopped by ~1.2s; full unforced read-through clean.
+
+---
+
+## 2026-08-04 (earlier) — page 5 part 4: the POUR mini-game (from Figma)
 
 Implemented the Figma frame **"Page 5 part 4"** (The-Glass-Half-Full-LBDs,
 node 745:508) as a FOURTH scene on page 5, with the tap-to-pour mechanic ported

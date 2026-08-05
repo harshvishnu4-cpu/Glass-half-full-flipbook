@@ -102,8 +102,11 @@ window.STORY = {
         // LAST FRAMES ARE BLANK WHITE (an export glitch), so move on before then.
         { src: "assets/pages/Page 5.mp4", hold: 3600 },         // mixing the juice
         { src: "assets/pages/Page 5 part 2.mp4",                // waiting to be tapped
-          tap: { after: 4800, at: { x: "46.7%", y: "53.5%" }, size: 150,
-                 label: "Tap the POUR button to pour the juice" } },
+          // anywhere: the cue is a tapping hand on open space — NOT a ring on
+          // the machine's POUR button, which is part 4's job. A tap anywhere on
+          // the screen continues (it always did; the hint now says so).
+          tap: { after: 4800, anywhere: true, at: { x: "27%", y: "62%" },
+                 label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
         // ── PART 4: POUR A GLASS (interactive — Figma "Page 5 part 4") ─────
         // The machine holds the juice; the reader taps POUR to fill the glass,
@@ -120,6 +123,8 @@ window.STORY = {
             stream: { x: "49.97%", top: "60%", h: "8%" },
             juice: "#F27FBE",
             taps: 4,
+            sound: "sfx/pour.wav",   // pour SFX per tap (wav = plays on Safari/iOS
+                                     // too; sfx/pour.ogg is the original source)
         } },
     ] },
 

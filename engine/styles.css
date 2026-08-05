@@ -146,8 +146,13 @@
      see the book's outer outline/edge around the turn.js pages. */
   /* The single hardcover board. It's BROADER on the RIGHT so it reads as the back
      cover the pages sit INSIDE (the tan page stack peeks in front of this edge). */
+  /* The right side is wider than the other three ON PURPOSE — it holds the tan
+     fore-edge (the pages still to be turned, .page-stack, up to 21px past the
+     page edge). But only a THIN board edge (6px) shows beyond the paper: the old
+     -42px left ~21px of bare dark board after the sheets, which read as the page
+     being misaligned in the frame rather than as book anatomy. */
   .book-frame {
-    position: absolute; inset: -16px -42px -16px -16px; z-index: 0;
+    position: absolute; inset: -16px -27px -16px -16px; z-index: 0;
     border-radius: 3px;
     background: linear-gradient(135deg, var(--cover) 0%, var(--cover-2) 55%, var(--cover-3) 100%);
     box-shadow: 0 26px 55px rgba(80,40,60,0.35), inset 0 0 0 3px rgba(255,255,255,0.14);
@@ -306,7 +311,6 @@
   .replay-btn svg { width: clamp(20px, 2vw, 26px); height: clamp(20px, 2vw, 26px); fill: #f4d67f; }
 
   /* The old fixed side-arrows are replaced by the corner arrows above. */
-  .arrow { display: none !important; }
 
   /* Soft drop shadow on the "floor" beneath the book — grows as it opens */
   .floor-shadow {
@@ -435,36 +439,6 @@
      the real page and .book-frame supplies the open book's outline. Fading it in
      used to flash a translucent pink panel over the page mid-transition. */
   .book.open .book-body { opacity: 0; }
-
-  /* One paper page filling the whole book, behind the leaves (the surface the
-     current single page rests on). Bound (square) on the left, rounded outside. */
-  .page-base {
-    position: absolute; inset: 1.4%;
-    background: var(--paper); opacity: 0;
-    transform: translateZ(-8px); border-radius: 2px 11px 11px 2px;
-    box-shadow: inset 12px 0 22px -18px rgba(0,0,0,0.12);
-    transition: opacity var(--cover-ms) ease;
-  }
-  .book.open .page-base { opacity: 1; transition: opacity 560ms ease 360ms; }
-
-  /* Inside-front-cover bookplate (the left page at the very start) */
-  .bookplate {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 12%;
-  }
-  .bookplate .line { font-family: var(--font-note); font-size: clamp(18px, 2.8vw, 32px); color: var(--ink); }
-  .bookplate .name-line { border-bottom: 3px dotted var(--accent); min-width: 62%; margin-top: 4px; }
-
-  /* "The End" note shown on the right base once every page is turned */
-  .end-note {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 8px; text-align: center;
-    padding: 12%; opacity: 0; transition: opacity 400ms ease 200ms; pointer-events: none;
-  }
-  .book.at-end .end-note { opacity: 1; }
-  .end-note .big { font-family: var(--font-head); font-weight: 700;
-                   font-size: clamp(22px, 3.4vw, 46px); color: var(--cover-2); }
-  .end-note .small { font-family: var(--font-note); font-size: clamp(16px, 2.4vw, 26px); }
 
   /* ==========================================================================
      THE 3D PAGE BLOCK  —  a real cuboid giving the closed book its thickness.
@@ -693,11 +667,6 @@
     content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     box-shadow: inset 0 0 40px rgba(10,7,30,0.5);
   }
-  /* The custom artwork already has its own title + characters, so hide the
-     placeholder title / subtitle / taped photo — keep only the "tap to open" hint. */
-  .cover .front .title,
-  .cover .front .subtitle,
-  .cover .front .cover-photo { display: none; }
   /* SPINE — a distinct darker band down the LEFT edge of the cover with gold
      double-bands near the head and tail (a bound hardcover's spine seen from
      the front, per the reference art). It darkens the board art rather than
@@ -734,33 +703,6 @@
   }
   .book.open .cover .front .back-fill,
   .cover-scene.parked .cover .front .back-fill { opacity: 1; }
-  /* The cream page-stack fore-edge is hidden — on the dark night cover it read as a
-     white line down the right edge. The book's thickness now comes only from the
-     (darkened) page-block behind the cover. */
-  .cover .front .fore-edge { display: none; }
-  .cover .title {
-    font-family: var(--font-head); font-weight: 700; line-height: 1.02;
-    font-size: clamp(24px, 4.4vw, 58px);
-    text-shadow: 0 3px 0 rgba(0,0,0,0.14);
-  }
-  .cover .subtitle {
-    font-family: var(--font-note); font-size: clamp(17px, 2.8vw, 32px); opacity: 0.96;
-  }
-  /* A taped-on keepsake photo (a random kid avatar) — reinforces the scrapbook look */
-  .cover .cover-photo {
-    position: relative; background: #fff; padding: 7px 7px 12px;
-    border-radius: 4px; transform: rotate(-5deg);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.28);
-  }
-  .cover .cover-photo img {
-    display: block; width: clamp(64px, 12vw, 128px); height: clamp(64px, 12vw, 128px);
-    object-fit: cover; border-radius: 3px; background: #eee;
-  }
-  .cover .cover-photo .tape {
-    position: absolute; top: -11px; left: 50%; width: 60px; height: 22px;
-    transform: translateX(-50%) rotate(-3deg);
-    background: var(--tape); box-shadow: 0 1px 3px rgba(0,0,0,0.14);
-  }
   /* Back of the cover (revealed on the left once the book is open) — SOLID blue,
      matching the cover theme. */
   .cover .back {
@@ -772,8 +714,6 @@
     box-shadow: inset 14px 0 26px -14px rgba(0,0,0,0.30),   /* spine-side shade */
                 inset 0 0 0 2px rgba(255,255,255,0.06);
   }
-  .cover .back .line { font-family: var(--font-note); font-size: clamp(18px, 2.8vw, 32px); color: rgba(255,255,255,0.92); }
-  .cover .back .name-line { border-bottom: 3px dotted rgba(255,255,255,0.7); min-width: 62%; margin-top: 4px; }
 
   /* ==========================================================================
      PLAY BUTTON  —  the only control on the closed cover; tapping it opens the
@@ -813,14 +753,12 @@
 
   /* ==========================================================================
      PAGES (leaves)  —  each sheet flips on the CENTRE spine in 3D.
-     Leaves live in a FLAT stacking context (#leaves) so classic z-index
-     re-stacking works reliably during a turn.
+     Leaves live in a FLAT stacking context so classic z-index re-stacking
+     works reliably during a turn.
      ========================================================================== */
   /* preserve-3d so each leaf's backface-visibility works (a flipped leaf shows
      its BACK, not a mirror of its front). z-index still resolves the paint order
      of these near-coplanar leaves, which is how the turning sheet stays on top. */
-  #leaves { position: absolute; inset: 0; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
-
   /* Each leaf is ONE full page filling the whole book, hinged on the LEFT edge
      (the spine). It has TWO faces: a FRONT (your content) and a BACK (a blank
      sheet — no content). Turning a leaf swings it left over the blue cover
@@ -835,9 +773,6 @@
     will-change: transform;
   }
   .leaf.flipped { transform: rotateY(-180deg); }
-  /* Resuming a saved read poses the already-turned leaves in one silent jump —
-     the reader bookmarked page N; they should not watch N pages flip on open. */
-  body.no-anim .leaf { transition: none !important; }
 
   .leaf .face {
     position: absolute; inset: 0; overflow: hidden;
@@ -1034,6 +969,12 @@
     50%      { transform: translate(-4%, 72%) scale(0.95); }
   }
   .scene-tap:active .scene-tap-spot { transform: translate(-50%, -50%) scale(0.94); }
+  /* `anywhere` taps: the cue means "tap the screen", not "tap this thing" — the
+     targeting ring AND the ripple circle go; just a big tapping hand on open
+     space (its press animation is the whole message). */
+  .scene-tap.anywhere .scene-tap-ring,
+  .scene-tap.anywhere .scene-tap-spot::after { display: none; }
+  .scene-tap.anywhere .scene-tap-hand { width: 62%; }
   @media (prefers-reduced-motion: reduce) {
     .scene-tap-ring, .scene-tap-spot::after, .scene-tap-hand { animation: none; }
     .scene-tap-hand { transform: translate(-4%, 86%); }
@@ -1191,46 +1132,6 @@
     -webkit-touch-callout: none;
   }
 
-  /* ==========================================================================
-     LBD GAME OVERLAY  —  the embedded Stairway Shuffle game.
-     A body-level iframe (NOT inside the 3D book) so it can expand to a true
-     full-screen box. JS gives it left/top/width/height matching the page for the
-     pre-LBD look; adding .fullscreen makes it fill the whole viewport.
-     ========================================================================== */
-  .lbd-stage {
-    position: fixed; left: 0; top: 0; width: 0; height: 0;
-    z-index: 600;                       /* above the book (z≤5), below the corner arrows (z700) */
-    overflow: hidden; border-radius: 12px;
-    background: #0a0f2d;                 /* game's night backdrop shows on any letterbox edge */
-    box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-    opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity 0.3s ease;      /* placement SNAPS; only the fade animates by default */
-  }
-  .lbd-stage.visible { opacity: 1; visibility: visible; pointer-events: auto; }
-  /* Enable the box-morph transition ONLY while expanding to / shrinking from full
-     screen — so simply LANDING on the page shows the game at page size instead of
-     making it grow out of the top-left corner. JS adds .lbd-anim for the toggle. */
-  .lbd-stage.lbd-anim {
-    transition: left 0.4s cubic-bezier(0.4,0,0.2,1),
-                top 0.4s cubic-bezier(0.4,0,0.2,1),
-                width 0.4s cubic-bezier(0.4,0,0.2,1),
-                height 0.4s cubic-bezier(0.4,0,0.2,1),
-                border-radius 0.4s ease, opacity 0.3s ease;
-  }
-  /* Full screen: fill the viewport and rise above the arrows / progress chip. */
-  .lbd-stage.fullscreen {
-    left: 0 !important; top: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important; height: 100dvh !important;   /* dvh where supported, vh fallback */
-    border-radius: 0; z-index: 1200; box-shadow: none;
-  }
-  #lbdFrame {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    border: 0; display: block; background: #0a0f2d;
-  }
-  /* While the game is full screen, get the book chrome out of the way. */
-  body.lbd-fullscreen .corner-arrow { display: none !important; }
-
   /* ---- Speech bubble (SVG) --------------------------------------------------
      A white comic bubble with a black outline + purple neon glow and a tail,
      drawn as an inline SVG so position, size, angle and tail direction are fully
@@ -1327,21 +1228,6 @@
   /* ==========================================================================
      CONTROLS  —  arrows, progress read-out, mute toggle
      ========================================================================== */
-  .arrow {
-    position: fixed; top: 50%; transform: translateY(-50%);
-    width: clamp(42px, 6vw, 60px); height: clamp(42px, 6vw, 60px);
-    border: none; border-radius: 50%; background: rgba(255,255,255,0.85);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-    font-size: clamp(20px, 3vw, 30px); color: var(--cover-2);
-    cursor: pointer; z-index: 700; display: none;
-    align-items: center; justify-content: center;
-    transition: transform 140ms ease, background 140ms ease, opacity 200ms ease;
-  }
-  .arrow:hover  { background: #fff; transform: translateY(-50%) scale(1.08); }
-  .arrow:active { transform: translateY(-50%) scale(0.94); }
-  .arrow:disabled { opacity: 0.3; cursor: default; }
-  .arrow.prev { left: clamp(6px, 3vw, 34px); } .arrow.next { right: clamp(6px, 3vw, 34px); }
-  body.is-open .arrow { display: flex; }
 
   /* (The bottom-centre "Page X / N" toolbar has been removed.) */
 

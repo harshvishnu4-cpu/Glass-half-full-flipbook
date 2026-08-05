@@ -87,9 +87,10 @@ tap — and only a tap moves the story on:
 
 | Field | What it does |
 |-------|--------------|
-| `tap.at` | where the ring sits — `{ x, y }` as CSS % of the page |
-| `tap.size` | ring diameter in book px (default 132) |
-| `tap.after` | ms into the clip to show the ring (default: when the clip ends) |
+| `tap.at` | where the cue sits — `{ x, y }` as CSS % of the page |
+| `tap.size` | cue diameter in book px (default 132) |
+| `tap.after` | ms into the clip to show the cue (default: when the clip ends) |
+| `tap.anywhere` | `true` → no targeting ring, just a tapping hand ("tap the screen", not "tap this thing") — place `at` on open space |
 | `tap.label` | what a screen reader announces |
 
 Set `tap.after` when the clip has a quiet tail — otherwise the reader sits looking
@@ -149,9 +150,10 @@ engine/           ← ⚙ the book itself — do NOT edit
 ```
 
 ## How the book behaves (built-in UX)
-- **It remembers the reader's place.** Closing the tab mid-story and reopening
-  resumes on the same page, with earlier pages' turn-locks already open.
-  Finishing the story or pressing *Read again* starts fresh.
+- **It remembers what's been watched.** The book always opens at page 1, but
+  pages already watched in an earlier sitting don't re-lock — getting back to
+  where you were is a few quick taps, not a re-watch. Finishing the story or
+  pressing *Read again* starts completely fresh.
 - **The music ducks under narration** and swells back between pages.
 - **If the browser blocks sound**, the page plays silently and a small "Tap the
   page for sound" chip appears — one tap fixes it.

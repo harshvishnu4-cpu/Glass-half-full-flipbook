@@ -87,22 +87,8 @@ const STORY = window.STORY || {};
 })();
 const pages = STORY.pages || [];   // ← the story's pages (defined in story.js)
 
-/* ---- Build one page face's media (image OR video OR lbd poster) ---------- */
+/* ---- Build one page face's media (image OR video) ------------------------ */
 function makeMedia(page) {
-  // "lbd" pages show a STILL poster on the leaf itself (seen while the page turns);
-  // the live, interactive game is a separate full-screen-capable overlay iframe
-  // (see the LBD OVERLAY section below) — it can't live inside the 3D-transformed
-  // leaf because CSS transforms trap position:fixed, so true fullscreen would fail.
-  if (page.type === "lbd") {
-    const img = document.createElement("img");
-    img.className = "page-media";
-    img.draggable = false;
-    img.addEventListener("dragstart", function (e) { e.preventDefault(); });
-    img.decoding = "async";
-    img.src = page.poster || "";
-    img.alt = "Stairway Shuffle — tap Start to play";
-    return img;
-  }
   const media = page.type === "video"
     ? document.createElement("video")
     : document.createElement("img");
@@ -122,7 +108,7 @@ function makeMedia(page) {
     // jump when the video then plays. Posters are tiny (~40KB) and live in assets/posters/.
     media.setAttribute("poster",
       page.src.replace(/^assets\//, "assets/posters/").replace(/\.(mp4|webm)$/i, ".webp"));
-    // LAZY: do NOT eager-buffer. With 25 videos, preload="auto" made the browser
+    // LAZY: do NOT eager-buffer. With many videos, preload="auto" made the browser
     // open + decode every clip on load (huge memory/CPU spike + open lag). We only
     // buffer the page you're on + the next one, on demand (see warmVideo()).
     media.preload = "none";
@@ -150,7 +136,7 @@ function makeMedia(page) {
     // blink repeatedly, and is skipped on the last page.
     media.addEventListener("ended", function () {
       hideSoundHint(media);                    // a muted clip that ends takes its hint with it
-      if (!opened || !ready || lbdFullscreen) return;
+      if (!opened || !ready) return;
       if (!leaves[flipped] || !leaves[flipped].contains(media)) return;   // only the current page
       duckMusic(false);                        // narration over → music swells back
       // THE CUE: the clip has played out → now the page may be turned.
@@ -402,6 +388,7 @@ function buildPourScene(layer, cfg) {
   const hintEl  = layer.querySelector(".pour-hint");
   const sound   = cfg.sound ? new Audio(encodeURI(cfg.sound)) : null;
   if (sound) sound.preload = "auto";
+  layer._pourSound = sound;                    // exposed for the headless tests
 
   let fillPct = 0, complete = false, timers = [], idleTimer = null;
   const wait = function (fn, ms) { timers.push(setTimeout(fn, ms)); };
@@ -502,9 +489,6 @@ const coverScene  = document.getElementById("coverScene");
 // book frame forms the left spine/cover edge (always visible when open); pages
 // flip normally. No two-page spread.
 const totalPages = pages.length;
-// Which leaf is the embedded LBD game (-1 if none). Used to show/hide the overlay.
-const LBD_INDEX = pages.findIndex(function (p) { return p.type === "lbd"; });
-
 // Each leaf is a full 16:9 page hinged on the LEFT spine:
 //   • FRONT = the page's full-bleed image / video (+ its speech bubble, if any).
 //   • BACK  = a BLANK parchment sheet (seen edge-on while the page turns).
@@ -593,110 +577,9 @@ const bookPop    = document.getElementById("bookPop");
 const bookFloat  = document.getElementById("bookFloat");
 const cover      = document.getElementById("cover");
 const hint       = document.getElementById("hint");
-const prevBtn    = document.getElementById("prev");
-const nextBtn    = document.getElementById("next");
 const cornerPrev  = document.getElementById("cornerPrev");
 const cornerNext  = document.getElementById("cornerNext");
 const replayBtn   = document.getElementById("replayBtn");   // lives on the THE END page (built above)
-
-/* ==========================================================================
-   LBD OVERLAY  —  the Stairway Shuffle game embedded as one page.
-   The game lives in a body-level iframe (#lbdStage) so it can grow to true
-   fullscreen (a transform on .flip-scale would otherwise trap position:fixed).
-   • pre-LBD  : the overlay is sized/positioned OVER the current page rectangle,
-                so the game's home screen looks like it's printed inside the book.
-   • start    : the game posts {source:"lbd", type:"lbd-start"} → we expand the
-                overlay to fill the whole screen.
-   • end/skip : the game posts {source:"lbd", type:"lbd-complete"} → we shrink the
-                overlay back into the page and auto-flip to the next page.
-   ========================================================================== */
-const lbdStage = document.getElementById("lbdStage");
-const lbdFrame = document.getElementById("lbdFrame");
-let lbdFullscreen = false;   // is the overlay expanded to full screen right now?
-let lbdStarted    = false;   // has the child tapped Start at least once this visit?
-let lbdWasOn      = false;   // was the overlay showing on the previous refresh?
-let lbdExiting    = false;   // guard so "complete" only advances once
-
-// Show the blurred pre-LBD backdrop inside the frame while the game is loading
-// (and while it's unloaded) so there is no dark flash — it matches the game's
-// own splash background, so the live home screen fades in seamlessly.
-if (lbdFrame && LBD_INDEX >= 0 && pages[LBD_INDEX].poster) {
-  lbdFrame.style.background = "#0a0f2d url('" + pages[LBD_INDEX].poster + "') center/cover no-repeat";
-}
-// Load the game into the iframe on demand (never on flipbook boot — it's heavy).
-function ensureLbdLoaded() {
-  if (LBD_INDEX < 0 || !lbdFrame || lbdFrame.dataset.loaded) return;
-  lbdFrame.src = pages[LBD_INDEX].src;
-  lbdFrame.dataset.loaded = "1";
-}
-// Unload the game so the NEXT visit starts fresh at the pre-LBD home screen.
-function resetLbd() {
-  if (!lbdFrame) return;
-  lbdStarted = false;
-  lbdFrame.src = "about:blank";
-  lbdFrame.dataset.loaded = "";
-}
-// Park the overlay exactly over the on-screen page rectangle (pre-LBD look).
-function positionLbdStage() {
-  if (!lbdStage) return;
-  const r = flipScaleEl.getBoundingClientRect();   // the scaled 1280×720 page area
-  lbdStage.style.left   = r.left   + "px";
-  lbdStage.style.top    = r.top    + "px";
-  lbdStage.style.width  = r.width  + "px";
-  lbdStage.style.height = r.height + "px";
-}
-let lbdAnimTimer = null;
-function setLbdFullscreen(on) {
-  if (!lbdStage) return;
-  lbdFullscreen = on;
-  positionLbdStage();                        // make the inline page-rect geometry current
-  lbdStage.classList.add("lbd-anim");        // turn the box-morph transition ON for this toggle
-  void lbdStage.offsetWidth;                 // commit, so the class change below animates from here
-  lbdStage.classList.toggle("fullscreen", on);   // expand to / shrink from full screen
-  document.body.classList.toggle("lbd-fullscreen", on);
-  clearTimeout(lbdAnimTimer);
-  lbdAnimTimer = setTimeout(function () { lbdStage.classList.remove("lbd-anim"); }, 460);
-}
-// Show the overlay + LOAD the game ONLY once we've fully landed on the LBD page,
-// and UNLOAD it the moment we leave. The game is never loaded on approach: it
-// autoplays its title voice-over / background music as soon as it loads, so
-// loading it early would leak "Stairway Shuffle" audio onto the previous page.
-function updateLbdOverlay() {
-  if (LBD_INDEX < 0 || !lbdStage) return;
-  const onLbd = opened && ready && !animating && flipped === LBD_INDEX;
-  if (onLbd) {
-    ensureLbdLoaded();                    // load only now → sound starts when you REACH the page
-    if (!lbdFullscreen) positionLbdStage();
-    lbdStage.classList.add("visible");
-    lbdStage.setAttribute("aria-hidden", "false");
-    lbdWasOn = true;
-  } else if (!lbdFullscreen) {           // never hide mid-game (we can't leave while fullscreen)
-    lbdStage.classList.remove("visible");
-    lbdStage.setAttribute("aria-hidden", "true");
-    if (lbdWasOn) {
-      lbdWasOn = false;
-      resetLbd();                         // unload → stops all game audio immediately + fresh next visit
-    }
-  }
-}
-// Game finished (or the temporary Skip was tapped): come back into the page, then
-// automatically turn to the next page.
-function exitLbd() {
-  if (lbdExiting) return;
-  lbdExiting = true;
-  setLbdFullscreen(false);                // shrink the game back into the page
-  setTimeout(function () {
-    lbdExiting = false;
-    if (flipped === LBD_INDEX) goNext();  // auto-advance to the next story page
-  }, 470);                                // just after the shrink transition (.4s)
-}
-// Listen for the game's messages (start → fullscreen, complete → advance).
-window.addEventListener("message", function (e) {
-  const d = e && e.data;
-  if (!d || d.source !== "lbd") return;
-  if (d.type === "lbd-start") { lbdStarted = true; setLbdFullscreen(true); }
-  else if (d.type === "lbd-complete") { exitLbd(); }
-});
 
 let opened = false;      // has the cover been opened?
 let ready  = false;      // has the cover FINISHED opening? (flips allowed only then)
@@ -1135,7 +1018,7 @@ function warmVideo(i) {
 
 /* Unlock ONE page's video for instant, sound-enabled playback: a muted
    play()→pause() done INSIDE a user gesture. We prime only the page being shown
-   and the next one — priming all 25 at once was the opening lag. */
+   and the next one — priming them all at once was the opening lag. */
 function primeVideo(i) {
   const leaf = leaves[i];
   if (!leaf) return;
@@ -1337,7 +1220,10 @@ function armSceneTap(layer, cfg, onTap) {
   const at = (cfg && cfg.at) || {};
   const hot = document.createElement("button");
   hot.type = "button";                         // focusable → Enter/Space work too
-  hot.className = "scene-tap";
+  hot.className = "scene-tap" + (cfg && cfg.anywhere ? " anywhere" : "");
+  // `anywhere: true` — the cue means "tap the SCREEN", not "tap this thing":
+  // the targeting ring is hidden (CSS) and only the tapping hand + ripple show,
+  // placed wherever `at` says (pick open space, off the artwork's own buttons).
   hot.setAttribute("aria-label", (cfg && cfg.label) || "Tap to continue the story");
   const spot = document.createElement("span");
   spot.className = "scene-tap-spot";
@@ -1523,7 +1409,7 @@ function refreshMedia() {
     clearTimeout(mediaDelayTimer); mediaDelayTimer = null; mediaDelayIdx = -1;
   }
   // Buffer + gesture-unlock ONLY this page and the next (so the upcoming flip is
-  // instant and keeps sound) — never all 25 videos at once.
+  // instant and keeps sound) — never every video at once.
   warmVideo(idx); warmVideo(idx + 1); primeVideo(idx + 1);
   // Pause every video that is NOT the current page.
   leaves.forEach(function (leaf, i) {
@@ -1614,7 +1500,6 @@ function refreshMedia() {
       dialogueDone(idx);                       // no dialogue at all (e.g. THE END)
     }
   }
-  updateLbdOverlay();                           // show/hide the embedded LBD game
   // Right-side page stack shrinks toward the end: 3 sheets → … → 0 on the last page.
   if (pageStackEl) pageStackEl.dataset.count = String(Math.max(0, Math.min(3, totalPages - 1 - flipped)));
   // Restart the idle → page-turn-hint countdown for the page we've just landed on
@@ -1670,8 +1555,6 @@ function goPrev() {
 
 /* ---- Nav state (the "Page X / N" counter has been removed) --------------- */
 function updateProgress() {
-  prevBtn.disabled = flipped <= 0;
-  nextBtn.disabled = flipped >= totalPages - 1;
   // Corner arrows: BACK is hidden on page 1 only (visible + usable everywhere
   // else, even mid-scene). NEXT stays HIDDEN until the page's scenes/dialogue
   // have fully played out (dialogueDone() re-runs this), then fades in.
@@ -1721,7 +1604,7 @@ function runOpenSequence() {
   bookFloat.classList.add("rest");     // stop the idle bob
   coverScene.classList.remove("parked");
   flipbookEl.style.zIndex = "";        // cover ABOVE the pages while it swings open
-  applyResume();                       // bookmark: jump to the saved page while still hidden
+  applyResume();                       // unlock previously watched pages (start stays page 1)
   keepAwake();                         // hands-off story → the screen must not sleep
   // Reveal the REAL page right away (it sits beneath the cover, masked by it).
   flipbookEl.classList.add("show");
@@ -1877,9 +1760,6 @@ if (tapCatcher) tapCatcher.addEventListener("mousemove", function (e) {
 
 // The play button itself (also covers keyboard: Enter/Space on the focused button).
 hint.addEventListener("click", function (e) { e.stopPropagation(); if (!opened) openBook(); });
-
-prevBtn.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); });
-nextBtn.addEventListener("click", function (e) { e.stopPropagation(); goNext(); });
 
 // Bottom-corner flip arrows (outside the book): back = left, forward = right.
 cornerPrev.addEventListener("click", function (e) { e.stopPropagation(); goPrev(); this.blur(); });
@@ -2055,9 +1935,6 @@ function onViewportChange() {
   clearTimeout(_resizeSettle);
   _resizeSettle = setTimeout(function () { document.body.classList.remove("is-resizing"); }, 220);
   fitScale();
-  // Re-park the LBD overlay over the (re-scaled) page — unless it's fullscreen,
-  // where it already fills the viewport via CSS.
-  if (lbdStage && lbdStage.classList.contains("visible") && !lbdFullscreen) positionLbdStage();
 }
 window.addEventListener("resize", onViewportChange);
 window.addEventListener("orientationchange", onViewportChange);
@@ -2180,48 +2057,39 @@ document.addEventListener("visibilitychange", function () {
   if (!document.hidden) keepAwake();           // hides always drop the lock — take it back
 });
 
-/* ---- REMEMBER WHERE THE READER LEFT OFF --------------------------------------
+/* ---- REMEMBER WHAT'S BEEN WATCHED ---------------------------------------------
    Every clip is watch-to-the-end gated, so losing your place is EXPENSIVE: a
    refresh on page 7 used to mean sitting through six clips again to get back.
-   The current page + which pages have been watched are saved on every landing;
-   opening the book later resumes right there, with the watched pages' turn cues
-   already unlocked. Finishing the story (THE END) or tapping Replay clears the
-   save — a fresh read is a deliberate act, and it gates afresh.
+   The set of watched pages is saved as the reader goes; on the next open the
+   book still starts at PAGE 1 (an earlier version jumped straight to the saved
+   page, which read as "the book starts in the middle" — a bug report, not a
+   feature), but every previously watched page's turn cue unlocks the moment it
+   is revisited — so getting back to where you were is a few quick taps, not a
+   re-watch. Finishing the story (THE END) or tapping Replay clears the memory —
+   a fresh read is a deliberate act, and it gates afresh.
    Keyed by the story's cover path, so two different books served from the same
-   origin don't inherit each other's bookmarks. localStorage can be unavailable
+   origin don't inherit each other's state. localStorage can be unavailable
    (privacy modes) — every touch is try/caught; the feature just disappears. */
 const PROGRESS_KEY = "flipbook-progress:" + (STORY.cover || "default");
 function saveProgress() {
   try {
-    if (flipped <= 0 || flipped >= totalPages - 1) { localStorage.removeItem(PROGRESS_KEY); return; }
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify({
-      page: flipped,
-      watched: Object.keys(videoWatched).map(Number),
-    }));
+    const watched = Object.keys(videoWatched).map(Number);
+    if (!watched.length || flipped >= totalPages - 1) { localStorage.removeItem(PROGRESS_KEY); return; }
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify({ watched: watched }));
   } catch (_) {}
 }
 function clearProgress() {
   try { localStorage.removeItem(PROGRESS_KEY); } catch (_) {}
 }
-function loadProgress() {
+/* Restore the watched set (never the position — the book always opens on page 1). */
+function applyResume() {
   try {
     const s = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "null");
-    if (!s || !(s.page > 0) || s.page >= totalPages - 1) return null;   // stale / story changed
-    return s;
-  } catch (_) { return null; }
-}
-/* Put the book straight into the saved pose — BEFORE the cover opens, with leaf
-   transitions suppressed so nothing visibly flips. The cover then swings open
-   onto the page the reader left, like a real bookmark. */
-function applyResume() {
-  const s = loadProgress();
-  if (!s) return;
-  flipped = s.page;
-  (s.watched || []).forEach(function (i) { videoWatched[i] = true; });
-  document.body.classList.add("no-anim");
-  renderLeaves();
-  void flipbookEl.offsetWidth;                 // pose committed without a transition
-  document.body.classList.remove("no-anim");
+    if (!s) return;
+    (s.watched || []).forEach(function (i) {
+      if (i >= 0 && i < totalPages - 1) videoWatched[i] = true;
+    });
+  } catch (_) {}
 }
 
 /* ---- Pause ALL audio when the tab / window goes to the background -----------
@@ -2351,8 +2219,7 @@ function soundOn() {
    When idle, two cues fire together: a hand taps the forward arrow AND the page
    itself does a "ghost" half-flip (lifts toward the next page, then falls back).
    Timing: PAGE 1 after 5s, every later page after 10s of no interaction; repeats
-   while idle and is cancelled by any tap / key / flip. Never on the last page or
-   while the LBD game is open.
+   while idle and is cancelled by any tap / key / flip. Never on the last page.
    ========================================================================== */
 // The nudge is a HAND on the RIGHT side of the book. Optional engine art at
 // engine/hand-nudge.png is used if present; until it exists, an emoji hand
@@ -2398,9 +2265,9 @@ function dialogueDone(idx) {
 }
 
 function canShowHint() {
-  return opened && ready && !animating && !lbdFullscreen &&
+  return opened && ready && !animating &&
          hintDoneFor === flipped &&          // never before the scene completes
-         flipped < totalPages - 1 && flipped !== LBD_INDEX && !document.hidden;
+         flipped < totalPages - 1 && !document.hidden;
 }
 function positionFlipHint() {
   if (!flipScaleEl) return;
