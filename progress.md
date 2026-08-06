@@ -13,7 +13,40 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-06 (latest) — glass-full reward line + new Page 7 clip
+## 2026-08-06 (latest) — "Full" sticker + arrow pop during the reward line
+
+Author added two images (`assets/pages/full text.png` — a "Full" sticker — and
+`pointer.png` — a white dashed arrow). New pour option **`pops`**: stickers that
+pop in WHILE the reward line plays, each timed to the word it illustrates —
+`{ src, at:{x,y}, w, time }`, `time` = ms into `fullSound`. Measured the line's
+envelope: the final emphatic "full" starts at **~5.4s**, so the sticker pops
+there (right of the machine) and the arrow follows at 5.6s, curling down to the
+glass. Each pop plays a **synthesized pop sfx** (`playPopSfx()` — a 520→160Hz
+sine blip through the existing Web Audio ctx; no asset file needed, silent when
+muted/unavailable). Springy `pourPopIn` keyframes (overshoot + settle);
+reduced-motion shows them statically. `_pourReset` re-hides them; timers ride
+the pour scene's cancellable `wait()` list, so leaving mid-line cancels cleanly.
+
+Verified: stickers hidden through pouring and the first 4.65s of the line, both
+shown at 5.85s (screenshot matches: Full → arrow → glass), cue after the line,
+hidden again after leaving; full unforced read-through clean.
+
+Resized to match the author's reference mockup: **both PNGs are 1080×1080
+canvases with the art occupying only ~66% of the width** (transparent padding),
+so the first sizes rendered far smaller than intended. Measured the opaque
+bounds (System.Drawing alpha scan: Full art 716×392 px, pointer art 716×480 px)
+and compensated — Full `w:20% at 62%/24%` (art lands at tank level, ~0.6× the
+machine's width like the mockup), pointer `w:34% at 50.5%/31%` (dash trail
+starts under "Full", loops, arrowhead just touches the glass's right edge at
+mid-height instead of covering it). Config comment in story.js warns that `w`
+is the CANVAS size. Re-verified via pops.js after each nudge.
+*(Test-writing note: my first timing assertion was wrong by 900ms because the
+tap loop's trailing sleep overlapped the completion delay — anchor assertions to
+a captured t0, not to accumulated sleeps.)*
+
+---
+
+## 2026-08-06 (earlier) — glass-full reward line + new Page 7 clip
 
 - **New pour option `fullSound`** — the author added a narration line ("This
   glass is filled all the way up. It is full.", `assets/audios/*.ogg`). OGG is

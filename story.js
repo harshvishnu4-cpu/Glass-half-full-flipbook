@@ -135,6 +135,18 @@ window.STORY = {
                                      // fills; the page unlocks after the line.
                                      // (wav twins of the .ogg sources, which are
                                      // silent on Safari/iOS.)
+            // Stickers that pop AS THE LINE IS SPOKEN (time = ms into it, put on
+            // the word it illustrates — the final "full" lands at ~5.4s): the
+            // "Full" sticker, then the dashed arrow curling down to the glass.
+            // (both PNGs are square canvases with the art floating in ~66% of
+            // the width — the w values are the CANVAS size, so the visible art
+            // is about two-thirds of each w.)
+            pops: [
+              { src: "assets/pages/full text.png", time: 5400,
+                at: { x: "62%", y: "24%" }, w: "20%" },
+              { src: "assets/pages/pointer.png",   time: 5600,
+                at: { x: "50.5%", y: "31%" }, w: "34%" },
+            ],
         } },
     ] },
     { type: "video", src: "assets/pages/Page 7.mp4"  },   // 10s

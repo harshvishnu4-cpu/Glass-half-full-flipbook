@@ -392,6 +392,21 @@ function buildPourScene(layer, cfg) {
   const fullSound = cfg.fullSound ? new Audio(encodeURI(cfg.fullSound)) : null;
   if (fullSound) fullSound.preload = "auto";
   layer._pourFullSound = fullSound;
+  // Sticker art that POPS while the reward line plays (`pops`): each entry is
+  // { src, at:{x,y}, w, time } — `time` = ms into the line (put it on the word
+  // it illustrates). Built hidden; shown with a spring + a synthesized pop sfx.
+  const popEls = (cfg.pops || []).map(function (pop) {
+    const img = document.createElement("img");
+    img.className = "pour-pop";
+    img.alt = "";
+    img.draggable = false;
+    img.src = encodeURI(pop.src);
+    img.style.left = (pop.at && pop.at.x) || "50%";
+    img.style.top  = (pop.at && pop.at.y) || "50%";
+    img.style.width = pop.w || "12%";
+    layer.appendChild(img);
+    return { el: img, time: pop.time || 0 };
+  });
 
   let fillPct = 0, complete = false, timers = [], idleTimer = null;
   const wait = function (fn, ms) { timers.push(setTimeout(fn, ms)); };
@@ -449,6 +464,10 @@ function buildPourScene(layer, cfg) {
             const p = fullSound.play();
             if (p && p.catch) p.catch(function () { onEnd(); });   // blocked → don't trap the page
           } catch (_) { onEnd(); }
+          // the stickers pop mid-line, each timed to the word it illustrates
+          popEls.forEach(function (pop) {
+            wait(function () { pop.el.classList.add("show"); playPopSfx(); }, pop.time);
+          });
           timers.push(setTimeout(onEnd, 9000));   // hard backstop (cleared if the page resets)
         }, 950);
       } else {
@@ -493,6 +512,7 @@ function buildPourScene(layer, cfg) {
     showHint(false);
     if (sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
     if (fullSound) { try { fullSound.onended = null; fullSound.pause(); fullSound.currentTime = 0; } catch (_) {} }
+    popEls.forEach(function (pop) { pop.el.classList.remove("show"); });   // stickers re-hidden
     layer.querySelectorAll(".pour-splash").forEach(function (d) { d.remove(); });
     const t = levelEl.style.transition, t2 = surfEl.style.transition;
     levelEl.style.transition = "none"; surfEl.style.transition = "none";   // reset without a visible drain
@@ -2191,6 +2211,26 @@ function playSfx(name, vol, rate) {
 }
 
 // Page-flip sound — snappy 1.5× on every ordinary flip.
+/* A tiny synthesized POP for sticker reveals — a sine blip whose pitch falls
+   520→160Hz over ~120ms. Web Audio, no asset file, glitch-free at any rate of
+   fire; silently absent when the ctx is unavailable or the book is muted. */
+function playPopSfx() {
+  if (!audioCtx || muted) return;
+  try {
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.exponentialRampToValueAtTime(160, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.012);   // fast attack = the "p"
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); // quick decay = the "op"
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + 0.18);
+  } catch (_) {}
+}
+
 function playFlip() {
   if (muted) return;                        // sound turns on when the book opens
   if (playSfx("flip", 1.0, 1.5)) return;    // Web Audio path
