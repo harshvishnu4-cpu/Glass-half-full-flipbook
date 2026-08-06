@@ -125,6 +125,31 @@ idling. Leaving the page empties the glass, so a revisit replays the scene.
 
 ---
 
+## The table scene (where the book sits)
+
+The closed book lies on a **Halloween desk** and **drops onto it** when the page
+loads: it falls in from close to the camera, lands with a small squash-and-settle,
+and a puff of dust bursts out from under its bottom edge.
+
+All of it is **one `<style>` block in `index.html`** plus the `.dust-burst`
+markup inside the book stage — nothing in `engine/` is involved. Delete those two
+pieces and you're back to the engine's starlit-night background.
+
+| To change… | Edit |
+|---|---|
+| the desk | `assets/table.png` — and re-make `table.webp` from it (the CSS loads the webp; the PNG is 14× heavier) |
+| how hard it lands | the `bookDrop` keyframes — `scale(2.35)` is the drop height, the `66%` stop is the impact |
+| the dust | the `<i>` elements in `.dust-burst` — `--x/--y` where a puff starts, `--dx/--dy` how far it drifts, `--s` its size, `--j` its delay |
+
+Two things to know if you move the dust: the closed book's board **overhangs the
+book area by about 48px**, so a puff placed at `--y:100%` is hidden *behind* the
+book — the bottom row sits at `99–104%`. And puffs need to be large (50–120px)
+and drift only a little, or they read as specks on the desk instead of dust
+kicked up by a landing book.
+
+Readers who ask for reduced motion get the book already resting on the desk, with
+no drop and no dust.
+
 ## Folder structure
 
 ```
@@ -134,6 +159,7 @@ README.md       ← this file
 assets/
   Cover page.jpg    ← ★ your cover (16:9)
   play button.svg   ← ★ your Play button artwork
+  table.png         ← ★ the desk the book lies on (table.webp is what loads)
   pages/            ← ★ your scene images & videos
   posters/pages/    ← first-frame stills, one per video (see Notes)
 sfx/

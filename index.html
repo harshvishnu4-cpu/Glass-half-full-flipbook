@@ -32,6 +32,92 @@
 
 <!-- Book styling / theme (engine — do not edit) -->
 <link rel="stylesheet" href="engine/styles.css" />
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PROJECT-LEVEL SCENE OVERRIDE (kept out of engine/ on purpose — delete this
+     block and the .dust-burst markup below to go back to the starlit night).
+
+     THE TABLE SCENE: the closed hardcover lies on a Halloween desk
+     (assets/table.png — purple wood, a candle top-left, a spider dangling
+     top-right, spellbook corners). A candle-warm glow lifts the centre where
+     the book lies and a vignette darkens the desk edges. On load the book
+     DROPS onto the table: it starts big (close to the camera), falls away
+     ~0.76s, lands with a cartoon squash-and-settle, the floor shadow snaps
+     in at impact and a ring of dust puffs bursts from under its edges.
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+  /* — the desk — */
+  body {
+    background:
+      radial-gradient(circle at 6% 4%, rgba(255,172,84,0.16), transparent 30%),  /* candle warmth */
+      radial-gradient(circle at 50% 46%, rgba(255,196,120,0.10), transparent 56%),/* glow under the book */
+      radial-gradient(ellipse at center, rgba(10,3,22,0) 52%, rgba(10,3,22,0.55) 100%), /* vignette */
+      url("assets/table.webp") center / cover no-repeat,   /* webp twin of table.png:
+                        1917KB → 134KB, the PNG stays as the editable source */
+      #241137;
+  }
+  /* the book lies ON the desk: no idle float, and the generic scene fade-in
+     is replaced by the drop itself */
+  .book-float { animation: none; }
+  .scene      { animation: none; }
+
+  /* cast shadow re-tinted to a deep plum so it reads on the dark wood */
+  .floor-shadow {
+    background: radial-gradient(ellipse at center, rgba(26,7,40,0.7), rgba(26,7,40,0) 70%);
+  }
+
+  /* — the drop — runs once on load, on .book-pop (a free pass-through wrapper:
+     the engine never transforms it, so nothing composes against this).
+     Top-down camera: "falling onto the desk" = shrinking away from the lens. */
+  .book-pop { animation: bookDrop 1150ms both; }
+  @keyframes bookDrop {
+    0%   { transform: scale(2.35) rotate(-4deg); opacity: 0; animation-timing-function: ease-in; }
+    8%   { opacity: 1; animation-timing-function: ease-in; }
+    66%  { transform: scale(1) rotate(0deg); animation-timing-function: ease-out; }  /* impact ~760ms */
+    74%  { transform: scale(1.05, 0.93); animation-timing-function: ease-in-out; }   /* squash */
+    86%  { transform: scale(0.982, 1.012); animation-timing-function: ease-in-out; } /* rebound */
+    100% { transform: scale(1); }
+  }
+  /* the shadow appears with the impact (fill:backwards so the engine's normal
+     open/close shadow transitions take over untouched once this ends) */
+  .floor-shadow { animation: shadowLand 1150ms ease backwards; }
+  @keyframes shadowLand {
+    0%   { opacity: 0; width: 26%; }
+    56%  { opacity: 0.15; width: 30%; }
+    66%  { opacity: 0.95; width: 47%; }   /* impact pulse */
+    80%  { opacity: 0.75; width: 44%; }
+    100% { opacity: 0.75; width: 44%; }
+  }
+
+  /* — the dust — <i> puffs in .dust-burst (markup in .book-stage below),
+     positioned in the book's 1280×720 space: --x/--y start point,
+     --dx/--dy outward drift (book px), --s size, --j delay jitter.
+     They fire at the impact moment (760ms into the drop). */
+  .dust-burst { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .dust-burst i {
+    position: absolute; left: var(--x); top: var(--y);
+    width: calc(var(--s) * 1px); height: calc(var(--s) * 0.7px);
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(246,236,255,0.95), rgba(198,170,234,0.5) 60%, transparent);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+    filter: blur(2px);
+    animation: dustPuff 820ms ease-out calc(760ms + var(--j, 0ms)) both;
+  }
+  @keyframes dustPuff {
+    0%   { opacity: 0;    transform: translate(-50%, -50%) scale(0.5); }
+    14%  { opacity: 0.95; }
+    55%  { opacity: 0.55; }
+    100% { opacity: 0;
+           transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.1); }
+  }
+
+  /* reduced motion: the book is simply there — no drop, no dust */
+  @media (prefers-reduced-motion: reduce) {
+    .book-pop, .floor-shadow { animation: none; }
+    .dust-burst { display: none; }
+  }
+</style>
 </head>
 
 <body>
@@ -55,6 +141,29 @@
     <!-- Outer hardcover outline — visible once the book is open -->
     <div class="book-frame"></div>
     <div class="floor-shadow"></div>
+
+    <!-- Dust puffs for the book-drop landing (see the scene override in <head>).
+         Densest along the bottom edge, a few up the sides, sparse on top. -->
+    <div class="dust-burst" aria-hidden="true">
+      <!-- Dust hugs the BOTTOM edge (where the book meets the desk — same line
+           as the floor shadow): an overlapping cloud of mixed sizes fanning
+           outward-down, plus one kick out of each bottom corner. The book's
+           page lip overhangs the 1280×720 stage by ~48px, so y≈105-108% sits
+           right at the visible silhouette. -->
+      <i style="--x:4%;   --y:99%; --dx:-46px; --dy:10px;  --s:78;  --j:20ms"></i>
+      <i style="--x:11%;  --y:102%; --dx:-30px; --dy:20px;  --s:100; --j:0ms"></i>
+      <i style="--x:20%;  --y:103%; --dx:-18px; --dy:28px;  --s:72;  --j:70ms"></i>
+      <i style="--x:30%;  --y:102%; --dx:-10px; --dy:30px;  --s:112; --j:30ms"></i>
+      <i style="--x:41%;  --y:104%; --dx:-4px;  --dy:34px;  --s:84;  --j:100ms"></i>
+      <i style="--x:50%;  --y:102%; --dx:0px;   --dy:32px;  --s:118; --j:10ms"></i>
+      <i style="--x:59%;  --y:104%; --dx:4px;   --dy:34px;  --s:80;  --j:90ms"></i>
+      <i style="--x:70%;  --y:102%; --dx:10px;  --dy:30px;  --s:110; --j:40ms"></i>
+      <i style="--x:80%;  --y:103%; --dx:18px;  --dy:28px;  --s:74;  --j:80ms"></i>
+      <i style="--x:89%;  --y:102%; --dx:30px;  --dy:20px;  --s:102; --j:20ms"></i>
+      <i style="--x:96%;  --y:99%; --dx:46px;  --dy:10px;  --s:78;  --j:60ms"></i>
+      <i style="--x:-1%;  --y:92%;  --dx:-40px; --dy:-2px;  --s:64;  --j:50ms"></i>
+      <i style="--x:101%; --y:92%;  --dx:40px;  --dy:-2px;  --s:64;  --j:40ms"></i>
+    </div>
 
     <!-- The page-turning book mounts here (JS injects one .leaf per page).
          Sits beneath the 3D cover layer; revealed once the cover swings open.

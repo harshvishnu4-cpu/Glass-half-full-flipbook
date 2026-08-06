@@ -13,7 +13,68 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-06 (latest) — "Full" sticker + arrow pop during the reward line
+## 2026-08-06 (latest) — the table scene + the book-drop entrance
+
+The book no longer floats on the engine's starlit-night gradient. It now lies on
+a **Halloween desk** (`assets/table.png` — purple wood, a candle top-left, a
+dangling spider top-right, spellbooks in the bottom corners) and **drops onto
+it** on load. Everything lives in ONE `<style>` block plus one `.dust-burst`
+markup island in `index.html` — **nothing in `engine/` was touched**, so
+deleting those two pieces restores the night scene exactly.
+
+**The desk.** `body` background = candle-warm glow top-left + a soft glow under
+the book + a vignette + `assets/table.webp`, `cover`. The `.floor-shadow` is
+re-tinted deep plum so the cast shadow reads on dark wood, and the engine's
+`idleBob` float is disabled (`.book-float { animation: none }`) — a book resting
+on a desk shouldn't hover. The `.scene` fade-in is off too; the drop replaces it.
+
+**The drop** (`bookDrop`, 1150ms on `.book-pop`). The camera is top-down, so
+"falling onto the desk" is played as **shrinking away from the lens**:
+`scale(2.35) rotate(-4deg)` → `scale(1)` at 66% (impact ≈760ms, ease-in for
+gravity) → squash `scale(1.05, 0.93)` → rebound `scale(0.982, 1.012)` → rest.
+`.book-pop` was chosen deliberately: it is a pure pass-through wrapper the
+engine never transforms (the open-pop moved to `.book-stage` long ago), so this
+animation can't compose against engine motion. Verified `#bookPop` ends at
+`matrix(1,0,0,1,0,0)` — no residual transform for the cover swing to fight.
+`shadowLand` runs alongside with `fill: backwards` only, so once it finishes the
+engine's own open/close shadow transitions resume untouched.
+
+**The dust** — 13 `<i>` puffs in `.dust-burst`, each a soft radial-gradient
+ellipse, fired at 760ms with per-puff `--j` jitter. Positioned in book space:
+`--x/--y` start, `--dx/--dy` outward drift, `--s` size. They hug the **bottom
+edge** (y ≈ 99–104%, where the book meets the desk, same line as the floor
+shadow) in overlapping mixed sizes, plus one kick out of each bottom corner.
+
+*Getting the dust visible took four passes, and the reason is worth recording:*
+the closed book's board and page lip **overhang the 1280×720 stage by ~48px**,
+so puffs placed at the stage's own edge (`--y:100%`) are **painted behind the
+book art** and invisible. They must sit just outside the visible silhouette.
+The first sizes (26–46px, drifting 80px) also read as faint specks scattered
+across the desk rather than a landing cloud — 52–118px puffs drifting only
+~30px sell the impact. Diagnosis method: seek `document.getAnimations()` to a
+fixed `currentTime`, then dump each puff's rect + computed opacity +
+`elementsFromPoint` (`dustdiag.js`). Note that `animation-delay` tricks fail
+here — `currentTime` is absolute and covers delay, so one value poses the whole
+entrance (`dropscrub3.js`); the earlier negative-delay attempts (`dropscrub.js`,
+`dropscrub2.js`) posed the layers inconsistently.
+
+**`assets/table.webp`** — the source PNG is **1917KB**, far too heavy for the
+phone read the author cares about. Canvas-converted at q=0.92 to **134KB**
+(93% smaller, visually identical; `towebp.js`). The CSS points at the webp; the
+PNG stays as the editable source. webp is already a hard dependency (posters,
+pour art).
+
+Reduced motion: no drop, no dust, no shadow animation — the book is simply
+there.
+
+Verified: 10 viewports from 3440×1440 to 568×320 — desk fills with no
+letterboxing, book stays centred (±2px) at 48–70% fill, Play button lands on the
+cover art, `#bookPop` at identity, **zero errors** (only the by-design
+`hand-nudge.png` 404); cover still opens and the full read-through is clean.
+
+---
+
+## 2026-08-06 — "Full" sticker + arrow pop during the reward line
 
 Author added two images (`assets/pages/full text.png` — a "Full" sticker — and
 `pointer.png` — a white dashed arrow). New pour option **`pops`**: stickers that
