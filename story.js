@@ -143,9 +143,9 @@ window.STORY = {
             // is about two-thirds of each w.)
             pops: [
               { src: "assets/pages/full text.png", time: 5400,
-                at: { x: "62%", y: "24%" }, w: "20%" },
+                at: { x: "63%", y: "19%" }, w: "27%" },
               { src: "assets/pages/pointer.png",   time: 5600,
-                at: { x: "50.5%", y: "31%" }, w: "34%" },
+                at: { x: "51.5%", y: "37%" }, w: "32%" },
             ],
         } },
     ] },
