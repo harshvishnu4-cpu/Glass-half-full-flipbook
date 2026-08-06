@@ -32,11 +32,12 @@
        bubble : optional speech bubble (below).
        pour   : an INTERACTIVE scene instead of src — the reader taps a POUR
                 button to fill a glass, one shot per tap; the page can only be
-                turned once the glass is full. See PAGE 5 below for a live
+                turned once the glass is full. See PAGE 6 below for a live
                 example with every field. Fields: bg / machine / button (image
                 paths), machineAt / buttonAt / glassAt ({x,y,w} in % of the
                 page), stream ({x,top,h}), juice (colour), taps (to fill,
-                default 4), sound (optional pour SFX path).
+                default 4), sound (pour SFX per tap), fullSound (spoken line
+                once the glass is full — the page unlocks after it finishes).
 
    • A single-image page (no scenes):  { type:"image", src, bubble }
      A single-video page:              { type:"video", src, delay }
@@ -79,7 +80,7 @@ window.STORY = {
      the hand nudge appears on the page corner 2s later. (The back arrow is
      always available.)
 
-     Page 5 is INTERACTIVE — it is three clips in one page (see `scenes` below).
+     Pages 5 and 6 are multi-scene; page 6 ends in the interactive POUR game.
      ──────────────────────────────────────────────────────────────────────── */
   pages: [
     { type: "video", src: "assets/pages/Page 1.mp4"  },   // 11s
@@ -108,11 +109,16 @@ window.STORY = {
           tap: { after: 4800, anywhere: true, at: { x: "27%", y: "62%" },
                  label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
-        // ── PART 4: POUR A GLASS (interactive — Figma "Page 5 part 4") ─────
-        // The machine holds the juice; the reader taps POUR to fill the glass,
-        // one shot per tap, 4 taps to the brim. The page can only be turned
-        // once the glass is FULL. Positions are % of the page (from the Figma
-        // frame). Add  sound: "sfx/pour.mp3"  here if a pour SFX is added.
+    ] },
+
+    // ── PAGE 6: story clip, then POUR A GLASS (interactive) ────────────────
+    // The 17s clip plays right through; when it ends, the page cross-dissolves
+    // to the juice machine (the Figma "Page 5 part 4" design) and the reader
+    // taps POUR to fill the glass — one shot per tap, 4 taps to the brim. The
+    // page can only be turned once the glass is FULL. Positions are % of the
+    // page (straight from the Figma frame).
+    { scenes: [
+        { src: "assets/pages/Page 6.mp4" },                     // advances when it ends
         { pour: {
             bg:      "assets/pages/pour/bg.webp",
             machine: "assets/pages/pour/machine.webp",
@@ -123,13 +129,15 @@ window.STORY = {
             stream: { x: "49.97%", top: "60%", h: "8%" },
             juice: "#F27FBE",
             taps: 4,
-            sound: "sfx/pour.wav",   // pour SFX per tap (wav = plays on Safari/iOS
-                                     // too; sfx/pour.ogg is the original source)
+            sound: "sfx/pour.wav",       // pour SFX per tap
+            fullSound: "sfx/glass-full.wav",   // "This glass is filled all the way
+                                     // up. It is full." — spoken once the glass
+                                     // fills; the page unlocks after the line.
+                                     // (wav twins of the .ogg sources, which are
+                                     // silent on Safari/iOS.)
         } },
     ] },
-
-    { type: "video", src: "assets/pages/Page 6.mp4"  },   // 17s
-    { type: "video", src: "assets/pages/Page 7.mp4"  },   // 18s
+    { type: "video", src: "assets/pages/Page 7.mp4"  },   // 10s
     { type: "video", src: "assets/pages/Page 8.mp4"  },   // 16s
     { type: "video", src: "assets/pages/Page 9.mp4"  },   // 31s
     { type: "video", src: "assets/pages/Page 10.mp4" },   // 15s

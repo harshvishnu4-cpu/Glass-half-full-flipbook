@@ -388,6 +388,10 @@ function buildPourScene(layer, cfg) {
   const sound   = cfg.sound ? new Audio(encodeURI(cfg.sound)) : null;
   if (sound) sound.preload = "auto";
   layer._pourSound = sound;                    // exposed for the headless tests
+  // Spoken reward once the glass is FULL ("This glass is filled all the way up…").
+  const fullSound = cfg.fullSound ? new Audio(encodeURI(cfg.fullSound)) : null;
+  if (fullSound) fullSound.preload = "auto";
+  layer._pourFullSound = fullSound;
 
   let fillPct = 0, complete = false, timers = [], idleTimer = null;
   const wait = function (fn, ms) { timers.push(setTimeout(fn, ms)); };
@@ -430,9 +434,27 @@ function buildPourScene(layer, cfg) {
       complete = true;
       btn.disabled = true;
       clearTimeout(idleTimer);
-      // let the stream fade + the liquid finish rising, hold the full glass a
-      // beat, THEN hand the page back to the scene player (turn cue arms).
-      wait(function () { if (layer._pourDone) layer._pourDone(); }, 1500);
+      const finish = function () { if (layer._pourDone) layer._pourDone(); };
+      if (fullSound) {
+        // Let the last stream fade and the liquid settle, then the spoken reward
+        // ("the glass is full") — the page hands back to the scene player (and
+        // the turn cue arms) only once the line has been HEARD, not over it.
+        wait(function () {
+          duckMusic(true);                     // narration over the music, as everywhere else
+          let rewarded = false;                // 'ended' and the backstop must not both finish
+          const onEnd = function () { if (rewarded) return; rewarded = true; duckMusic(false); finish(); };
+          fullSound.onended = onEnd;           // assignment, so a replay never stacks listeners
+          try {
+            fullSound.currentTime = 0;
+            const p = fullSound.play();
+            if (p && p.catch) p.catch(function () { onEnd(); });   // blocked → don't trap the page
+          } catch (_) { onEnd(); }
+          timers.push(setTimeout(onEnd, 9000));   // hard backstop (cleared if the page resets)
+        }, 950);
+      } else {
+        // no reward line configured: hold the full glass a beat, then hand back
+        wait(finish, 1500);
+      }
     }
   }
   function spawnSplash() {                     // 5 throwaway droplets at the mouth
@@ -470,6 +492,7 @@ function buildPourScene(layer, cfg) {
     streamEl.classList.remove("pouring");
     showHint(false);
     if (sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
+    if (fullSound) { try { fullSound.onended = null; fullSound.pause(); fullSound.currentTime = 0; } catch (_) {} }
     layer.querySelectorAll(".pour-splash").forEach(function (d) { d.remove(); });
     const t = levelEl.style.transition, t2 = surfEl.style.transition;
     levelEl.style.transition = "none"; surfEl.style.transition = "none";   // reset without a visible drain

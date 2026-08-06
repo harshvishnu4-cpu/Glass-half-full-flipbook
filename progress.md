@@ -13,7 +13,45 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-04 (latest) — navigating to a page always restarts its clip
+## 2026-08-06 (latest) — glass-full reward line + new Page 7 clip
+
+- **New pour option `fullSound`** — the author added a narration line ("This
+  glass is filled all the way up. It is full.", `assets/audios/*.ogg`). OGG is
+  silent on Safari/iOS, so it was converted (ogg2wav recipe) to
+  **`sfx/glass-full.wav`** (6.16s, 531KB) and wired as `fullSound` on page 6's
+  pour config. Sequence on the 4th tap: stream fades (~0.95s) → music ducks →
+  the line plays → **the page unlocks only after the line ends** (fullSound
+  `onended`; catch/9s backstop so a blocked or broken audio can never trap the
+  page; a `rewarded` flag stops the backstop double-finishing). `_pourReset`
+  silences it when the reader leaves mid-line.
+- **Page 7 re-authored in place** (17.7s → 10.4s). Same drill as Page 1's
+  replacement: poster regenerated from the new frame 0, faststart verified,
+  tail frame clean. story.js duration comment updated.
+
+Verified: during the line — playing, music 0.06, cue hidden; after — cue up,
+music 0.20; leaving mid-line silences it; full unforced read-through clean.
+
+---
+
+## 2026-08-06 (earlier) — the POUR game moved from page 5 to the end of page 6
+
+Author restructure: the pour interaction is no longer page 5's fourth scene.
+Page 5 is back to its three clips (mix → tap-anywhere wait → pour-into-tank),
+with the turn cue arming when part 3 ends. Page 6 changed from a single-video
+page to a scenes page: **[Page 6.mp4 → pour game]** — the 17s clip plays right
+through, cross-dissolves to the juice machine, and the reader fills the glass
+(4 taps) before the page can turn. Pure story.js change — the engine's scene
+player already supported a video scene advancing into a `pour` finale.
+Note: page 6 is now a scenes page, so it no longer joins `videoWatched` —
+revisiting it replays clip + pour, same contract as page 5.
+
+Verified: page 5 cue arms at part 3's end with no pour present; page 6 clip
+plays → pour arms only after it ends → ArrowRight refused mid-game → 4 taps →
+cue; full unforced read-through clean (page 6 scene 2/2 pour logged 4 taps).
+
+---
+
+## 2026-08-04 — navigating to a page always restarts its clip
 
 Author report: going BACK to a page mid-clip resumed the video from where it had
 paused instead of restarting. `playVideoNow(v, restart)` semantics tightened: a
