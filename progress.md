@@ -13,7 +13,26 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — the drop sound on Vercel: diagnosed, then gated behind a tap
+## 2026-08-07 (latest) — the tap-to-begin gate was REVERTED
+
+Author: "no need to add tap to begin text or interaction." The gate below is
+**gone** — no prompt, no extra tap, the book drops on load exactly as before,
+and the thud is best-effort again. Removed cleanly: the `<head>` script, the
+`html.awaiting-drop` rules, the `.drop-gate` styles and its keyframes; nothing
+left behind (verified — no gate element, no class, no "tap to begin" text
+anywhere, `.scene` interactive from the start, and **one** tap on Play opens the
+book).
+
+**Where that leaves the sound, stated plainly so nobody re-opens this:** on a
+cold first visit to the hosted site the thud does not play, and *cannot* — see
+the diagnosis below. It plays on any later visit or reload. The entrance was
+judged worth more than the effect. The only two ways to change that are the
+gate (reverted here) or dropping on the Play tap (rejected — it delays the
+story). `sfx/book-drop.wav` and the level tuning all stay as they are.
+
+---
+
+## 2026-08-07 — the drop sound on Vercel: diagnosed, then gated behind a tap *(gate since reverted, see above)*
 
 Author: the thud doesn't play on the hosted build. **Diagnosed before changing
 anything**, by serving the folder over HTTP and loading it in Edge with its

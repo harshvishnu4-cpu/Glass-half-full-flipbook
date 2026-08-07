@@ -144,15 +144,11 @@ back to the engine's starlit-night background.
 | the dust | the `<i>` elements in `.dust-burst` — `--x/--y` where a puff starts, `--dx/--dy` how far it drifts, `--s` its size, `--j` its delay |
 | the landing thud | swap `sfx/book-drop.wav`, or change its `volume` in the small `<script>` at the bottom of `index.html` |
 
-**The drop waits for a tap, on purpose.** A browser will not play any sound
-until the reader has touched the page, so a book that dropped the instant the
-page loaded could never be heard — hosted or not. The page therefore opens on
-the empty desk with a small "Tap to begin", and that tap releases the drop, the
-dust and the sound together. If nobody taps within 5 seconds the book drops
-anyway, silently, so it can never get stuck.
-
-To go back to dropping on load (and accept a silent landing), set `GATE = false`
-in the script in `<head>`.
+**About the landing sound.** Browsers refuse to play any sound until the reader
+has touched the page, and the book drops the moment the page loads — so on a
+first visit the thud is silent. It plays on later visits. This is the browser's
+rule, not a fault in the book, and there is no way around it that keeps the drop
+on load. Nothing is broken when it doesn't sound.
 
 If you replace the sound, keep most of its energy **above ~190Hz**. Small
 speakers barely reproduce deep bass, so a thud that is mostly low rumble is
