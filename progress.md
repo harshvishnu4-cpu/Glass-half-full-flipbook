@@ -13,7 +13,50 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — the author's hand art, everywhere; tap cue moved onto the machine
+## 2026-08-07 (latest) — highlight moved to the glass, a genuinely full glass, harder pops, drop thud
+
+**The highlight is on the GLASS now, not the "Full" text.** The glow keyframes
+came off `.pour-pop-hero` and went onto `.pour-glass.full` — a warm halo that
+breathes, added by `setJuice` the moment the fill hits 100% and removed on
+reset. The sticker keeps its pulse (slightly stronger, 1.09×), just no glow of
+its own. The reasoning is sound: the glass is the thing that *changed*, so
+that's where the eye should go.
+
+**Why the glass didn't look full, and the actual fix.** Raising `TOP_Y` to the
+brim yesterday wasn't enough, and the author's reference photo showed why: in a
+real full glass you look down into **juice**, but `CUP_MOUTH` is an opaque grey
+disc (`#DFDAD0`) painted *over* the liquid, so the top always read as empty cup
+no matter how high the level went. Added a second `CUP_MOUTH` path filled with
+a **darker twin of the juice** (`shade(juice, 0.9)`), faded in over the last
+third of the fill (`(f − 0.62) / 0.38`) — so the mouth turns to juice as the
+glass fills and is solid juice at 100%. Also added **8 bubbles** suspended in
+the liquid; they sit inside the fill clip, so they only appear where there is
+juice. Close-up now matches the reference.
+
+**Stronger pops.** `pourPopIn` was a modest 0.35 → 1.08 → 1. It is now a
+four-stage throw: **0.18 → 1.28 → 0.93 → 1.06 → 1** with a −14° → +7° → −4°
+rotation swing over 640ms. The counter-swing is what makes it read as *thrown
+on* rather than faded in.
+
+**A soft thud when the book lands.** Synthesized in Web Audio — a low sine
+dropping 155→46Hz for the hardcover hitting wood, plus a short puff of
+low-passed noise for the dust — fired at the drop's 760ms impact frame. No
+asset, nothing to load. It lives in `index.html` with the rest of the table
+scene (so removal is now **three** things: the `<style>` block, the
+`.dust-burst` markup and this `<script>`), and it closes its AudioContext after
+a second.
+
+> **Honest limit, worth remembering:** browsers refuse audio until the reader
+> has interacted with the page, and the drop happens *on load* — so on a first
+> visit this thud is usually **silent**. It plays on revisits and wherever the
+> browser's autoplay policy allows. There is no fix that keeps the entrance on
+> load; the alternative is holding the drop until the first tap. Verified it
+> genuinely emits sound (peak amplitude 0.29) by patching `AudioContext` to tap
+> the destination through an analyser, rather than just asserting no error.
+
+---
+
+## 2026-08-07 — the author's hand art, everywhere; tap cue moved onto the machine
 
 **`assets/pages/hand nudge.webp` is now the hand in all three nudges** — the
 page-turn hint, the "tap the screen" cue and the POUR hint. (It had been sitting

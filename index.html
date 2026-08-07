@@ -34,8 +34,9 @@
 <link rel="stylesheet" href="engine/styles.css" />
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     PROJECT-LEVEL SCENE OVERRIDE (kept out of engine/ on purpose — delete this
-     block and the .dust-burst markup below to go back to the starlit night).
+     PROJECT-LEVEL SCENE OVERRIDE (kept out of engine/ on purpose — to go back
+     to the starlit night delete THREE things: this block, the .dust-burst
+     markup below, and the drop-sfx <script> at the bottom of <body>).
 
      THE TABLE SCENE: the closed hardcover lies on a Halloween desk
      (assets/table.png — purple wood, a candle top-left, a spider dangling
@@ -274,6 +275,55 @@
 <script src="story.js"></script>
 <!-- The flip engine (reads window.STORY) — do not edit -->
 <script src="engine/script.js"></script>
+
+<!-- Part of the TABLE SCENE (see the <style> block in <head>): a soft thud the
+     moment the book lands, so the drop has weight instead of being silent.
+     Synthesized with Web Audio — no asset, nothing to load, and it costs the
+     book nothing if it never plays. Two honest limits:
+       • browsers refuse audio before the reader has interacted with the page,
+         and the drop happens on load — so on a first visit this is usually
+         SILENT. It plays on revisits and wherever the browser allows it. There
+         is no way around that without holding the entrance until a tap.
+       • reduced-motion readers get no drop, so they get no thud either. -->
+<script>
+(function () {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var IMPACT_MS = 760;                       // the landing frame of bookDrop
+  setTimeout(function () {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      var ctx = new AC();
+      if (ctx.state === "suspended" && ctx.resume) ctx.resume();
+      if (ctx.state === "suspended") { ctx.close && ctx.close(); return; }   // blocked → stay quiet
+      var t = ctx.currentTime;
+      // body of the thud — a low sine dropping in pitch, like a hardcover
+      // hitting wood; kept soft (0.3) so it sits under the music, not over it
+      var osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(155, t);
+      osc.frequency.exponentialRampToValueAtTime(46, t + 0.19);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.38);
+      // and the dust: a short puff of low-passed noise, fading as it settles
+      var len = Math.floor(ctx.sampleRate * 0.24);
+      var buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var n = ctx.createBufferSource(); n.buffer = buf;
+      var lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1300;
+      var ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.1, t);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      n.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
+      n.start(t); n.stop(t + 0.26);
+      setTimeout(function () { try { ctx.close(); } catch (e) {} }, 1200);
+    } catch (e) { /* no audio here — the drop just plays silently */ }
+  }, IMPACT_MS);
+})();
+</script>
 
 <!-- ⚠ DEV ONLY — page-jump hamburger for testing. DELETE THIS ONE LINE and the
      dev/ folder to remove it completely; it touches nothing else. -->

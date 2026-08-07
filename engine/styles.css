@@ -1086,42 +1086,51 @@
     -webkit-user-drag: none; user-drag: none;
   }
   .pour-scene .pour-pop.show {
-    animation: pourPopIn 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: pourPopIn 640ms cubic-bezier(0.30, 1.7, 0.55, 1) both;
   }
+  /* A BIG pop: from almost nothing, past full size, a counter-swing, then
+     settle. The overshoot and the rotation swing are what make it read as
+     "thrown on" rather than "faded in". */
   @keyframes pourPopIn {
-    0%   { opacity: 0; transform: scale(0.35) rotate(-6deg); }
-    65%  { opacity: 1; transform: scale(1.08) rotate(2deg);  }
-    100% { opacity: 1; transform: scale(1)    rotate(0deg);  }
+    0%   { opacity: 0; transform: scale(0.18) rotate(-14deg); }
+    45%  { opacity: 1; transform: scale(1.28) rotate(7deg);   }
+    66%  { opacity: 1; transform: scale(0.93) rotate(-4deg);  }
+    83%  { opacity: 1; transform: scale(1.06) rotate(1.5deg); }
+    100% { opacity: 1; transform: scale(1)    rotate(0deg);   }
   }
   /* HERO sticker (`emphasis: true` in story.js — the "Full" reward itself):
-     a warm glow so it reads as lit up, and a gentle pulse that carries on after
-     the pop lands. The pulse is listed AFTER the pop and starts as the pop
-     ends, so it takes over `transform` cleanly instead of fighting it. */
-  .pour-scene .pour-pop-hero {
-    filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
-            drop-shadow(0 0 16px rgba(255, 201, 92, 0.85))
-            drop-shadow(0 0 34px rgba(255, 173, 51, 0.45));
-  }
+     keeps a gentle pulse after landing. It carries NO glow — the highlight
+     belongs on the glass, which is the thing that actually changed. The pulse
+     is listed after the pop and starts as the pop ends, so it takes over
+     `transform` cleanly instead of fighting it. */
   .pour-scene .pour-pop-hero.show {
-    animation: pourPopIn 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-               pourPopPulse 1.5s ease-in-out 520ms infinite,
-               pourPopGlow  1.5s ease-in-out 520ms infinite;
+    animation: pourPopIn 640ms cubic-bezier(0.30, 1.7, 0.55, 1) both,
+               pourPopPulse 1.5s ease-in-out 640ms infinite;
   }
   @keyframes pourPopPulse {
-    0%, 100% { transform: scale(1)     rotate(0deg);    }
-    50%      { transform: scale(1.075) rotate(-1.4deg); }
+    0%, 100% { transform: scale(1)    rotate(0deg);    }
+    50%      { transform: scale(1.09) rotate(-1.8deg); }
   }
-  @keyframes pourPopGlow {
-    0%, 100% { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
-                       drop-shadow(0 0 14px rgba(255, 201, 92, 0.7))
-                       drop-shadow(0 0 30px rgba(255, 173, 51, 0.35)); }
-    50%      { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
-                       drop-shadow(0 0 22px rgba(255, 214, 122, 1))
-                       drop-shadow(0 0 48px rgba(255, 173, 51, 0.6)); }
+  /* THE GLASS is what gets highlighted, and only once it is full: a warm halo
+     that breathes, so the eye lands on the filled glass rather than the label */
+  .pour-scene .pour-glass.full {
+    animation: pourGlassGlow 1.6s ease-in-out infinite;
   }
+  @keyframes pourGlassGlow {
+    0%, 100% { filter: drop-shadow(0 0 7px  rgba(255, 214, 122, 0.55))
+                       drop-shadow(0 0 18px rgba(255, 150, 210, 0.35)); }
+    50%      { filter: drop-shadow(0 0 15px rgba(255, 226, 158, 0.95))
+                       drop-shadow(0 0 34px rgba(255, 150, 210, 0.6));  }
+  }
+  /* the mouth's juice disc fades in with the level (set in setJuice) */
+  .pour-scene .pour-mouth-juice { transition: opacity 700ms ease-out; }
   @media (prefers-reduced-motion: reduce) {
     .pour-scene .pour-pop.show,
     .pour-scene .pour-pop-hero.show { animation: none; opacity: 1; transform: none; }
+    .pour-scene .pour-glass.full {
+      animation: none;
+      filter: drop-shadow(0 0 12px rgba(255, 214, 122, 0.8));
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     .pour-scene .pour-stream.pouring { animation-duration: 0.4s; }

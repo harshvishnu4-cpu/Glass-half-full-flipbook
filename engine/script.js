@@ -358,6 +358,21 @@ function buildPourScene(layer, cfg) {
            ";width:" + (o && o.w || dw) + ";";
   };
   const st = cfg.stream || {};
+  // a darker twin of the juice for the MOUTH — looking down into a full glass
+  // you see juice, not the empty cup's grey disc. Without this the glass still
+  // read "not quite full" however high the level went.
+  const shade = function (hex, k) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    return "#" + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+      return ("0" + Math.max(0, Math.min(255, Math.round(v * k))).toString(16)).slice(-2);
+    }).join("");
+  };
+  // a few bubbles suspended in the juice; they live INSIDE the fill clip, so
+  // they only show where there is actually juice
+  const FIZZ = [[44, 96, 3.1], [63, 84, 2.2], [52, 74, 1.7], [72, 104, 2.6],
+                [38, 118, 2.0], [58, 112, 3.4], [79, 90, 1.6], [47, 132, 2.3]];
   layer.classList.add("pour-scene");
   layer.innerHTML =
     '<img class="pour-bg" alt="" draggable="false" src="' + encodeURI(cfg.bg || "") + '">' +
@@ -373,11 +388,19 @@ function buildPourScene(layer, cfg) {
       '<path d="' + CUP_FRONT + '" fill="#EAE7E0"/>' +
       '<g clip-path="url(#' + uid + 'clip)">' +
         '<path d="' + CUP_FRONT + '" fill="' + juice + '"/>' +
+        FIZZ.map(function (b) {
+          return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] +
+                 '" fill="#ffffff" opacity="0.34"/>';
+        }).join("") +
       '</g>' +
       '<ellipse class="pour-surface" cx="57" cy="0" rx="52" ry="7" fill="' + juice + '" ' +
         'style="filter:brightness(1.18);transform:translateY(' + BOT_Y + 'px) scaleX(0.64);opacity:0"/>' +
       '<path d="' + CUP_RIM + '" fill="#F8FBF6"/>' +
       '<path d="' + CUP_MOUTH + '" fill="#DFDAD0"/>' +
+      // the mouth filled with juice, faded in with the level — this is what
+      // makes a full glass actually LOOK full from above
+      '<path class="pour-mouth-juice" d="' + CUP_MOUTH + '" fill="' +
+        shade(juice, 0.9) + '" style="opacity:0"/>' +
     '</svg>' +
     '<button class="pour-btn" type="button" disabled aria-label="Pour the juice" ' +
         'style="' + at(cfg.buttonAt, "6%") + '">' +
@@ -401,6 +424,8 @@ function buildPourScene(layer, cfg) {
   const levelEl = layer.querySelector(".pour-level");
   const surfEl  = layer.querySelector(".pour-surface");
   const hintEl  = layer.querySelector(".pour-hint");
+  const glassEl = layer.querySelector(".pour-glass");
+  const mouthEl = layer.querySelector(".pour-mouth-juice");
   const sound   = cfg.sound ? new Audio(encodeURI(cfg.sound)) : null;
   if (sound) sound.preload = "auto";
   layer._pourSound = sound;                    // exposed for the headless tests
@@ -442,6 +467,10 @@ function buildPourScene(layer, cfg) {
     const k = 0.64 + 0.36 * ((BOT_Y - y) / (BOT_Y - TOP_Y));
     surfEl.style.transform = "translateY(" + y.toFixed(1) + "px) scaleX(" + k.toFixed(3) + ")";
     surfEl.style.opacity = f > 0.01 ? "1" : "0";
+    // the mouth turns from the empty cup's grey to juice over the last third of
+    // the fill, and the whole glass lights up once it's full
+    if (mouthEl) mouthEl.style.opacity = Math.max(0, (f - 0.62) / 0.38).toFixed(3);
+    if (glassEl) glassEl.classList.toggle("full", f >= 0.999);
   }
   function pour() {
     if (complete || btn.disabled || fillPct >= 100) return;
@@ -527,11 +556,16 @@ function buildPourScene(layer, cfg) {
     if (fullSound) { try { fullSound.onended = null; fullSound.pause(); fullSound.currentTime = 0; } catch (_) {} }
     popEls.forEach(function (pop) { pop.el.classList.remove("show"); });   // stickers re-hidden
     layer.querySelectorAll(".pour-splash").forEach(function (d) { d.remove(); });
-    const t = levelEl.style.transition, t2 = surfEl.style.transition;
-    levelEl.style.transition = "none"; surfEl.style.transition = "none";   // reset without a visible drain
+    const t = levelEl.style.transition, t2 = surfEl.style.transition,
+          t3 = mouthEl ? mouthEl.style.transition : "";
+    // reset without a visible drain — the mouth's juice disc has its own
+    // 700ms fade, which would otherwise be seen emptying on the way out
+    levelEl.style.transition = "none"; surfEl.style.transition = "none";
+    if (mouthEl) mouthEl.style.transition = "none";
     setJuice(0);
     void layer.offsetWidth;
     levelEl.style.transition = t; surfEl.style.transition = t2;
+    if (mouthEl) mouthEl.style.transition = t3;
   };
 }
 

@@ -132,15 +132,21 @@ The closed book lies on a **Halloween desk** and **drops onto it** when the page
 loads: it falls in from close to the camera, lands with a small squash-and-settle,
 and a puff of dust bursts out from under its bottom edge.
 
-All of it is **one `<style>` block in `index.html`** plus the `.dust-burst`
-markup inside the book stage — nothing in `engine/` is involved. Delete those two
-pieces and you're back to the engine's starlit-night background.
+All of it lives in `index.html` — one `<style>` block, the `.dust-burst` markup
+inside the book stage, and a small `<script>` at the bottom for the landing
+sound. Nothing in `engine/` is involved. Delete those three pieces and you're
+back to the engine's starlit-night background.
 
 | To change… | Edit |
 |---|---|
 | the desk | `assets/table.png` — and re-make `table.webp` from it (the CSS loads the webp; the PNG is 14× heavier) |
 | how hard it lands | the `bookDrop` keyframes — `scale(2.35)` is the drop height, the `66%` stop is the impact |
 | the dust | the `<i>` elements in `.dust-burst` — `--x/--y` where a puff starts, `--dx/--dy` how far it drifts, `--s` its size, `--j` its delay |
+| the landing thud | the small `<script>` at the bottom of `index.html` — it synthesises the sound, so there's no file to swap |
+
+The thud is usually **silent on a first visit**: browsers don't allow sound
+until the reader has interacted with the page, and the book drops the moment the
+page loads. It plays on later visits. Nothing is broken when it doesn't sound.
 
 Two things to know if you move the dust: the closed book's board **overhangs the
 book area by about 48px**, so a puff placed at `--y:100%` is hidden *behind* the
