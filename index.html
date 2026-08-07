@@ -113,12 +113,124 @@
            transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.1); }
   }
 
-  /* reduced motion: the book is simply there — no drop, no dust */
+  /* — waiting for the reader — the drop is held at its first frame (the book
+     is off-camera and invisible there) until a tap, because a browser will not
+     play the landing sound before the reader has touched the page. Freezing
+     the animation costs nothing: unpausing resumes it from time 0. */
+  /* keyed off <html>, not <body>: the class is set by a script in <head> so the
+     animations are frozen BEFORE the first paint. Pausing them from the end of
+     <body> is a race — the drop has often already started, and the book flashes
+     into view half-fallen. */
+  html.awaiting-drop .book-pop,
+  html.awaiting-drop .floor-shadow,
+  html.awaiting-drop .dust-burst i { animation-play-state: paused; }
+  /* the held book is INVISIBLE but would still be hit-testable, so a tap where
+     the Play button is about to appear would open the book mid-drop. Take the
+     scene out of hit-testing until it has landed; the gate's own listener is
+     on window, so the releasing tap still registers. */
+  html.awaiting-drop .scene { pointer-events: none; }
+
+  .drop-gate {
+    position: fixed; inset: 0; z-index: 900;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    pointer-events: none;                     /* the tap belongs to the page */
+    transition: opacity 300ms ease;
+  }
+  .drop-gate.gone { opacity: 0; }
+  .drop-gate img {
+    width: clamp(46px, 5.5vw, 78px); height: auto;
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.55));
+    animation: dropGateTap 1.5s ease-in-out infinite;
+  }
+  .drop-gate span {
+    font-family: var(--font-title, "Fredoka", sans-serif);
+    font-size: clamp(15px, 1.7vw, 21px); letter-spacing: 0.05em;
+    color: #f4d67f; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  }
+  @keyframes dropGateTap {
+    0%, 100% { transform: translateY(0)    scale(1);    }
+    50%      { transform: translateY(-9px) scale(0.94); }
+  }
+
+  /* reduced motion: the book is simply there — no drop, no dust, no gate */
   @media (prefers-reduced-motion: reduce) {
     .book-pop, .floor-shadow { animation: none; }
     .dust-burst { display: none; }
+    .drop-gate { display: none; }
   }
 </style>
+
+<!-- THE DROP GATE — part of the table scene. It is in <head> on purpose: it
+     freezes the drop animation before the FIRST PAINT. Run from the end of
+     <body> it is a race, and the book flashes into view already half-fallen.
+     The DOM work waits for DOMContentLoaded; only the class is set here. -->
+<script>
+(function () {
+  var GATE = true;                           // false → drop on load, silently
+  var IMPACT_MS = 760;                       // the landing frame of bookDrop
+  var FALLBACK_MS = 5000;                    // never leave the desk empty
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  var thud = null;
+  try {
+    // an <audio> element, NOT fetch() + Web Audio: fetch is blocked on file://
+    // URLs, and this book has to work when index.html is simply double-clicked
+    thud = new Audio("sfx/book-drop.wav");
+    thud.preload = "auto";
+    thud.volume = 0.55;                      // ≈6× a page flip
+  } catch (e) {}
+
+  function playThud() {
+    if (!thud) return;
+    setTimeout(function () {
+      try {
+        var p = thud.play();
+        if (p && p.catch) p.catch(function () {});
+      } catch (e) {}
+    }, IMPACT_MS);
+  }
+
+  if (!GATE) { playThud(); return; }
+
+  var root = document.documentElement;
+  root.classList.add("awaiting-drop");       // BEFORE first paint — see above
+
+  var EVENTS = ["pointerdown", "keydown", "touchstart"];   // gestures that unlock audio
+  var released = false, timer = null, gate = null;
+
+  function release(withSound) {
+    if (released) return;
+    released = true;
+    clearTimeout(timer);
+    EVENTS.forEach(function (e) { window.removeEventListener(e, onGesture, true); });
+    if (gate) {
+      gate.classList.add("gone");
+      setTimeout(function () { if (gate.parentNode) gate.parentNode.removeChild(gate); }, 340);
+    }
+    root.classList.remove("awaiting-drop");  // the drop runs from its first frame
+    if (withSound) playThud();
+  }
+  function onGesture() { release(true); }
+
+  function start() {
+    if (released) return;                    // released before the DOM was ready
+    gate = document.createElement("div");
+    gate.className = "drop-gate";
+    gate.setAttribute("aria-hidden", "true");
+    gate.innerHTML = '<img src="assets/pages/hand%20nudge.webp" alt="" draggable="false">' +
+                     "<span>Tap to begin</span>";
+    document.body.appendChild(gate);
+  }
+
+  EVENTS.forEach(function (e) { window.addEventListener(e, onGesture, true); });
+  // if nobody touches anything, drop it anyway rather than sit on an empty desk
+  timer = setTimeout(function () { release(false); }, FALLBACK_MS);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else start();
+})();
+</script>
 </head>
 
 <body>
@@ -295,31 +407,26 @@
      loudness — an impact should clearly outweigh a page rustle without being a
      shock for a small child.
 
-     ONE LIMIT, AND IT IS THE BROWSER NOT THE BOOK: audio is refused until the
-     reader has interacted with the page, and the book drops on load — so on a
-     genuinely cold first visit this stays silent. It sounds on revisits. The
-     only guaranteed fix is holding the drop until the first tap, which would
-     change the entrance. Reduced-motion readers get no drop, so no thud. -->
-<script>
-(function () {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  var IMPACT_MS = 760;                       // the landing frame of bookDrop
-  var thud;
-  try {
-    // an <audio> element, NOT fetch() + Web Audio: fetch is blocked on file://
-    // URLs, and this book has to work when index.html is simply double-clicked
-    thud = new Audio("sfx/book-drop.wav");
-    thud.preload = "auto";
-    thud.volume = 0.55;                      // ≈6× a page flip — see the note above
-  } catch (e) { return; }
-  setTimeout(function () {
-    try {
-      var p = thud.play();
-      if (p && p.catch) p.catch(function () {});   // autoplay refused → stay silent
-    } catch (e) {}
-  }, IMPACT_MS);
-})();
-</script>
+     WHY THE DROP WAITS FOR A TAP: hosted on Vercel the thud never played, and
+     the cause was not the file (it serves fine, 200 / audio/wav / fully
+     loaded) — it was the browser:
+         NotAllowedError: play() failed because the user didn't
+         interact with the document first.
+     No browser will play sound before the reader has touched the page, and
+     the book was dropping on load, before any touch could happen. There is no
+     way to have both an on-load drop and a sound; the drop has to hang off a
+     tap. So the drop is HELD at its first frame (the book is off-camera and
+     invisible there) behind a light "Tap to begin" prompt, and the reader's
+     tap releases the drop, the dust and the thud together.
+
+     The alternative — dropping on the Play tap instead — was rejected: it
+     would push the story ~0.9s further behind that tap, and the opening delay
+     is something this book has already been tuned to keep short.
+
+     Set GATE to false in the <head> script to go back to dropping on load,
+     accepting that it will be silent on a first visit. Reduced-motion readers
+     get no drop, no gate and no thud.
+     (The script itself lives in <head> — see the note there for why.) -->
 
 <!-- ⚠ DEV ONLY — page-jump hamburger for testing. DELETE THIS ONE LINE and the
      dev/ folder to remove it completely; it touches nothing else. -->

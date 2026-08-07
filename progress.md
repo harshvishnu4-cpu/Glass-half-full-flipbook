@@ -13,7 +13,64 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — highlight moved to the glass, a genuinely full glass, harder pops, drop thud
+## 2026-08-07 (latest) — the drop sound on Vercel: diagnosed, then gated behind a tap
+
+Author: the thud doesn't play on the hosted build. **Diagnosed before changing
+anything**, by serving the folder over HTTP and loading it in Edge with its
+NORMAL autoplay policy (no flags) — the closest thing to Vercel:
+
+```
+network : book-drop.wav  200  audio/wav          ← file is fine
+element : readyState 4, duration 0.78            ← fully loaded
+play()  : NotAllowedError: play() failed because the user
+          didn't interact with the document first.
+```
+
+So it was never Vercel, the path, the case, or the MIME type — all of which I
+checked first. It is the browser refusing sound before the reader has touched
+the page, and the book was dropping *on load*, before any touch could exist.
+
+**The fix: the drop now waits for the reader.** The animation is held at its
+first frame (where the book is off-camera and invisible) behind a light
+"Tap to begin" prompt using the story's own hand art. The tap releases the
+drop, the dust and the thud together — and because a tap *is* the activation
+the browser wants, the sound plays. If nobody touches anything within **5s**
+the book drops anyway, silently, so the desk is never left empty.
+
+Two traps this hit, both worth remembering:
+
+- **Pausing from the end of `<body>` is a race.** The CSS animation starts at
+  first style resolution, often before an end-of-body script runs, so the book
+  flashed into view already half-fallen — intermittently, which is the worst
+  kind. The class is now set on `<html>` from a script in `<head>`, before the
+  first paint, and the CSS keys off `html.awaiting-drop`.
+- **An invisible element is still clickable.** The held book has `opacity: 0`
+  but was still hit-testable, so a tap where the Play button was about to appear
+  would open the book mid-drop. `html.awaiting-drop .scene { pointer-events:
+  none }` fixes it; the gate's own listener is on `window`, so the releasing tap
+  still registers.
+
+**Rejected alternative:** dropping on the Play tap instead. It would have
+avoided the extra tap, but pushed the story ~0.9s further behind that tap — and
+the opening delay is something this book has already been tuned to keep short
+(see the mediaGate work). One cheap tap before the book appears beats a slower
+start every time.
+
+`GATE = false` in the `<head>` script restores the old drop-on-load behaviour,
+silent on a first visit.
+
+Verified over HTTP with the default autoplay policy: the drop is held with the
+book invisible, the tap makes **the thud actually sound** and plays it through,
+the book lands and opens and page 1 plays, and with no tap at all the book still
+appears with Play ready. No errors.
+
+*Test note: scripts that used to open with `click("#hint")` must now release the
+gate first (`keyboard.press("Shift")`, then wait out the 1.15s drop) — the scene
+is not hit-testable until the book lands. `verify8.js` has been updated.*
+
+---
+
+## 2026-08-07 — highlight moved to the glass, a genuinely full glass, harder pops, drop thud
 
 **The highlight is on the GLASS now, not the "Full" text.** The glow keyframes
 came off `.pour-pop-hero` and went onto `.pour-glass.full` — a warm halo that
