@@ -315,7 +315,11 @@ function makeFx(fx, layer) {
    reports back through layer._pourDone, and resetScenes calls layer._pourReset
    so a revisit starts with an empty glass. */
 /* The pointing hand, shared by the page-turn nudge, the tap hot-spot and the
-   pour hint. Declared BEFORE the leaf builder — buildPourScene runs at load. */
+   pour hint. Declared BEFORE the leaf builder — buildPourScene runs at load.
+   The story supplies the artwork (`handNudge` in story.js, same idea as
+   `playButton`); the inline SVG below is the fallback when it doesn't, so the
+   engine still works with no art at all. */
+const HAND_ART = (window.STORY && STORY.handNudge) ? encodeURI(STORY.handNudge) : "";
 const HAND_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" ' +
   'd="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 ' +
@@ -323,6 +327,14 @@ const HAND_SVG =
   '4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6C13 6.67 12.33 6 11.5 6S10 ' +
   '6.67 10 7.5v10.74l-3.44-.72c-.37-.08-.76.04-1.02.31l-1.04 1.05 5.19 ' +
   '5.19c.28.28.66.44 1.06.44h6.78c.75 0 1.38-.55 1.49-1.29l.77-5.44c.1-.72-.29-1.42-.95-1.71z"/></svg>';
+// MUST stay below HAND_SVG: buildPourScene calls this while the leaves are
+// built at load, and a const referenced before its line throws (TDZ) — that
+// exact mistake once took the whole book down with a blank page.
+const handMarkup = function () {
+  return HAND_ART
+    ? '<img src="' + HAND_ART + '" alt="" draggable="false">'
+    : HAND_SVG;
+};
 
 let _pourSeq = 0;
 function buildPourScene(layer, cfg) {
@@ -381,7 +393,7 @@ function buildPourScene(layer, cfg) {
         (parseFloat(cfg.buttonAt && cfg.buttonAt.y || 50) + parseFloat(cfg.buttonAt && cfg.buttonAt.w || 6) * 16 / 18).toFixed(2) +
         '%;--spot:112px;opacity:0">' +
       '<span class="scene-tap-ring"></span>' +
-      '<span class="scene-tap-hand">' + HAND_SVG + "</span>" +
+      '<span class="scene-tap-hand">' + handMarkup() + "</span>" +
     "</span>";
 
   const btn     = layer.querySelector(".pour-btn");
@@ -1278,7 +1290,7 @@ function armSceneTap(layer, cfg, onTap) {
   spot.style.top  = at.y || "50%";
   if (cfg && cfg.size) spot.style.setProperty("--spot", cfg.size + "px");
   spot.innerHTML = '<span class="scene-tap-ring"></span>' +
-                   '<span class="scene-tap-hand">' + HAND_SVG + '</span>';
+                   '<span class="scene-tap-hand">' + handMarkup() + '</span>';
   hot.appendChild(spot);
   layer.appendChild(hot);
   requestAnimationFrame(function () { hot.classList.add("show"); });   // fade in
@@ -2263,15 +2275,16 @@ function soundOn() {
    Timing: PAGE 1 after 5s, every later page after 10s of no interaction; repeats
    while idle and is cancelled by any tap / key / flip. Never on the last page.
    ========================================================================== */
-// The nudge is a HAND on the RIGHT side of the book. Optional engine art at
-// engine/hand-nudge.png is used if present; until it exists, an emoji hand
-// stands in (the <img> error handler swaps to it).
+// The nudge is a HAND on the RIGHT side of the book — the story's own artwork
+// (`handNudge`) when it supplies one, otherwise the engine's optional
+// engine/hand-nudge.png, and failing both the inline SVG hand (swapped in by
+// the <img> error handler) so the cue is never missing.
 let flipHint = document.createElement("img");
 flipHint.className = "flip-hint";
 flipHint.setAttribute("aria-hidden", "true");
 flipHint.alt = "";
 flipHint.decoding = "async";
-flipHint.src = "engine/hand-nudge.png";
+flipHint.src = HAND_ART || "engine/hand-nudge.png";
 flipHint.addEventListener("error", function () {
   const el = document.createElement("div");
   el.className = "flip-hint flip-hint--svg";

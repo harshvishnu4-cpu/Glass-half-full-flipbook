@@ -26,6 +26,7 @@ window.STORY = {
   cover: "assets/my-cover.png",
   playButton: "assets/wish button.svg",   // the Play button artwork
   playAt: { x: "50%", y: "77%" },         // where it sits on the cover
+  handNudge: "assets/pages/hand nudge.webp",  // the pointing hand used by every nudge
   music: "sfx/my-music.mp3",              // remove this line for a silent book
   pages: [ /* your pages … */ ]
 };
@@ -90,7 +91,7 @@ tap — and only a tap moves the story on:
 | `tap.at` | where the cue sits — `{ x, y }` as CSS % of the page |
 | `tap.size` | cue diameter in book px (default 132) |
 | `tap.after` | ms into the clip to show the cue (default: when the clip ends) |
-| `tap.anywhere` | `true` → no targeting ring, just a tapping hand ("tap the screen", not "tap this thing") — place `at` on open space |
+| `tap.anywhere` | `true` → no targeting ring, just a tapping hand ("tap the screen", not "tap this thing"). With no ring, `at` is the **centre of the hand**, so point it at whatever the scene is about |
 | `tap.label` | what a screen reader announces |
 
 Set `tap.after` when the clip has a quiet tail — otherwise the reader sits looking
@@ -159,6 +160,7 @@ README.md       ← this file
 assets/
   Cover page.jpg    ← ★ your cover (16:9)
   wish button.svg   ← ★ your Play button artwork
+  pages/hand nudge.webp  ← ★ the pointing hand for every nudge (`handNudge`)
   table.png         ← ★ the desk the book lies on (table.webp is what loads)
   pages/            ← ★ your scene images & videos
   posters/pages/    ← first-frame stills, one per video (see Notes)

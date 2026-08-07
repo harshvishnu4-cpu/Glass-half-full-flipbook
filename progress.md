@@ -13,7 +13,53 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — five pour-scene fixes (author's list)
+## 2026-08-07 (latest) — the author's hand art, everywhere; tap cue moved onto the machine
+
+**`assets/pages/hand nudge.webp` is now the hand in all three nudges** — the
+page-turn hint, the "tap the screen" cue and the POUR hint. (It had been sitting
+unused in the repo since 08-04; the engine was drawing its own plain white SVG
+hand.)
+
+Wired it the same way as `playButton` rather than hard-coding a path in the
+engine: **`handNudge` in story.js**, read once into `HAND_ART`, with
+`handMarkup()` returning either an `<img>` or the built-in SVG. Delete the
+story line and the engine still has a hand. `engine/` stays story-agnostic,
+which is the whole point of the template split — and the long-standing
+`engine/hand-nudge.png` 404 is finally gone.
+
+Two traps this hit:
+
+- **TDZ, again.** `handMarkup()` reads `HAND_SVG`, and `buildPourScene` calls it
+  while the leaves are built at load. Declared above `HAND_SVG` it throws and
+  takes the whole book down with a blank page — the exact failure from the first
+  pour build. It now sits *below* `HAND_SVG` with a comment saying why.
+- **CSS specificity vs reduced motion.** The new centred-hand rules
+  (`.scene-tap.anywhere .scene-tap-hand`, `.pour-scene .pour-hint …`) are
+  3-class selectors, so they outranked the reduced-motion block's 1-class
+  `.scene-tap-hand { animation: none }` no matter where it sat. Readers who ask
+  for less motion would have kept a nudging hand. Added matching-specificity
+  overrides; verified with Playwright's `reducedMotion: "reduce"`.
+
+`.scene-tap-hand img` also needed the sizing rule the `svg` child already had,
+or the art rendered at its natural size.
+
+**The tap-anywhere cue now sits ON the machine.** It was at `x 27%` — empty
+table, chosen back when the brief was "point at open space, not at POUR". The
+machine in Page 5 part 2 is centred at **x 45.23%** (measured off the frame at
+the cue moment), so `at` is now `45.2% / 58%` and the hand points up at the
+machine. It is still `anywhere: true` — no targeting ring, a tap anywhere still
+counts; only the hand's *placement* changed.
+
+For that to be exact, the hand also had to be **centred on its `at` point**.
+The shared cue deliberately hangs the hand below-right of its anchor to avoid
+covering what the ring circles — but a ring-less cue has nothing to avoid, and
+the offset put the hand 2.9% off the machine's centre. `.anywhere` and
+`.pour-hint` now share one `handPressCentred` keyframe, so `at` means the middle
+of the hand: measured **45.20% against the machine's 45.23%**.
+
+---
+
+## 2026-08-07 — five pour-scene fixes (author's list)
 
 **1. Hand nudge centred on POUR.** Measured it: the ring was already dead-centre
 on the button (dx 0.00%) but the *hand* sat **dx 1.85% / dy 9.04%** off — the

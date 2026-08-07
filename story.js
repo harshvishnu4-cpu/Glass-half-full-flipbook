@@ -66,6 +66,11 @@ window.STORY = {
   playButton: "assets/wish button.svg",
   playAt: { x: "50%", y: "77%" },
 
+  // The pointing hand used by EVERY nudge — the page-turn hint, the "tap the
+  // screen" cue and the POUR hint. Remove this line and the engine falls back
+  // to its own plain white hand.
+  handNudge: "assets/pages/hand nudge.webp",
+
   // Looping background music (any file in sfx/). Remove this line for silence.
   music: "sfx/BG Music.mp3",
 
@@ -109,7 +114,11 @@ window.STORY = {
           // after: the clip is 8.5s but its narration runs 0.8s→5.0s, so the cue
           // comes up at 5.1s — the moment the line lands, not 3.4s later when
           // the clip finally ends (and not at 4.8s, over the last word).
-          tap: { after: 5100, anywhere: true, at: { x: "27%", y: "62%" },
+          // at: ON THE MACHINE (its centre in this clip is x 45.2%), not off in
+          // the empty table space it used to sit in — a tap anywhere still
+          // counts (`anywhere` drops the targeting ring), but the hand now
+          // draws the eye to the thing the story is about.
+          tap: { after: 5100, anywhere: true, at: { x: "45.2%", y: "58%" },
                  label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
     ] },

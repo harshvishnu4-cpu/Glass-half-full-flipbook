@@ -954,7 +954,10 @@
     filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.6));
     animation: sceneTapPress 1.6s ease-in-out infinite;
   }
-  .scene-tap-hand svg { display: block; width: 100%; height: auto; }
+  /* the hand is either the story's artwork (an <img>) or the built-in <svg> */
+  .scene-tap-hand svg,
+  .scene-tap-hand img { display: block; width: 100%; height: auto; }
+  .scene-tap-hand img { -webkit-user-drag: none; user-drag: none; }
   @keyframes sceneTapRing {
     0%, 100% { transform: scale(0.9);  opacity: 0.75; }
     50%      { transform: scale(1.06); opacity: 1; }
@@ -974,10 +977,26 @@
      space (its press animation is the whole message). */
   .scene-tap.anywhere .scene-tap-ring,
   .scene-tap.anywhere .scene-tap-spot::after { display: none; }
-  .scene-tap.anywhere .scene-tap-hand { width: 62%; }
+  /* With no ring to sit clear of, the hand is CENTRED on its `at` point — so
+     the coordinate in story.js means the middle of the hand, and a cue aimed
+     at (say) the machine actually lands on it. Same treatment as .pour-hint. */
+  .scene-tap.anywhere .scene-tap-hand {
+    width: 62%;
+    animation: handPressCentred 1.6s ease-in-out infinite;
+  }
+  @keyframes handPressCentred {
+    0%, 100% { transform: translate(-50%, -44%) scale(1);    }
+    50%      { transform: translate(-50%, -56%) scale(0.93); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .scene-tap-ring, .scene-tap-spot::after, .scene-tap-hand { animation: none; }
     .scene-tap-hand { transform: translate(-4%, 86%); }
+    /* the centred variants are 3-class selectors, so they need matching
+       specificity here or they'd keep animating for readers who asked not to */
+    .scene-tap.anywhere .scene-tap-hand,
+    .pour-scene .pour-hint .scene-tap-hand {
+      animation: none; transform: translate(-50%, -50%);
+    }
   }
 
   /* ==========================================================================
@@ -1055,12 +1074,8 @@
      target would hide it; POUR is a small disc, and a hand sitting under it
      read as pointing at the machine's body instead of at the button. */
   .pour-scene .pour-hint .scene-tap-hand {
-    width: 40%;                                 /* smaller, so "POUR" still reads */
-    animation: pourHandPress 1.6s ease-in-out infinite;
-  }
-  @keyframes pourHandPress {
-    0%, 100% { transform: translate(-50%, -44%) scale(1);    }
-    50%      { transform: translate(-50%, -56%) scale(0.93); }
+    width: 34%;              /* small enough that "POUR" still reads under it */
+    animation: handPressCentred 1.6s ease-in-out infinite;   /* shared with .anywhere */
   }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the
      glass) — hidden until their word, then a springy pop-in. */
