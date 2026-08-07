@@ -276,51 +276,47 @@
 <!-- The flip engine (reads window.STORY) — do not edit -->
 <script src="engine/script.js"></script>
 
-<!-- Part of the TABLE SCENE (see the <style> block in <head>): a soft thud the
-     moment the book lands, so the drop has weight instead of being silent.
-     Synthesized with Web Audio — no asset, nothing to load, and it costs the
-     book nothing if it never plays. Two honest limits:
-       • browsers refuse audio before the reader has interacted with the page,
-         and the drop happens on load — so on a first visit this is usually
-         SILENT. It plays on revisits and wherever the browser allows it. There
-         is no way around that without holding the entrance until a tap.
-       • reduced-motion readers get no drop, so they get no thud either. -->
+<!-- Part of the TABLE SCENE (see the <style> block in <head>): the thud when
+     the book lands, so the drop has weight. This replaces an earlier
+     synthesized attempt with the author's own recording.
+
+     WHICH TAKE, AND WHY: sfx/Book drop.mp3 holds NINE separate takes. The one
+     at 10.796s is the keeper — a single clean impact with a natural settle,
+     the loudest of the nine, and with two-thirds of its energy in the
+     150Hz-4kHz band that laptop and phone speakers actually reproduce. (The
+     take that scored best on mid-range alone turned out to be pages riffling
+     rather than a drop; the waveform showed it, the numbers didn't.) It is cut
+     to sfx/book-drop.wav — 0.78s, mono, faded at both ends so there is no
+     click, normalised. The full mp3 stays as the source and is never loaded;
+     re-cut with a different take by changing START in the scratchpad's
+     dropcut.js.
+
+     LEVEL: played at 0.55, so the reader hears roughly six times a page flip's
+     loudness — an impact should clearly outweigh a page rustle without being a
+     shock for a small child.
+
+     ONE LIMIT, AND IT IS THE BROWSER NOT THE BOOK: audio is refused until the
+     reader has interacted with the page, and the book drops on load — so on a
+     genuinely cold first visit this stays silent. It sounds on revisits. The
+     only guaranteed fix is holding the drop until the first tap, which would
+     change the entrance. Reduced-motion readers get no drop, so no thud. -->
 <script>
 (function () {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   var IMPACT_MS = 760;                       // the landing frame of bookDrop
+  var thud;
+  try {
+    // an <audio> element, NOT fetch() + Web Audio: fetch is blocked on file://
+    // URLs, and this book has to work when index.html is simply double-clicked
+    thud = new Audio("sfx/book-drop.wav");
+    thud.preload = "auto";
+    thud.volume = 0.55;                      // ≈6× a page flip — see the note above
+  } catch (e) { return; }
   setTimeout(function () {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
     try {
-      var ctx = new AC();
-      if (ctx.state === "suspended" && ctx.resume) ctx.resume();
-      if (ctx.state === "suspended") { ctx.close && ctx.close(); return; }   // blocked → stay quiet
-      var t = ctx.currentTime;
-      // body of the thud — a low sine dropping in pitch, like a hardcover
-      // hitting wood; kept soft (0.3) so it sits under the music, not over it
-      var osc = ctx.createOscillator(), g = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(155, t);
-      osc.frequency.exponentialRampToValueAtTime(46, t + 0.19);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.3, t + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
-      osc.connect(g); g.connect(ctx.destination);
-      osc.start(t); osc.stop(t + 0.38);
-      // and the dust: a short puff of low-passed noise, fading as it settles
-      var len = Math.floor(ctx.sampleRate * 0.24);
-      var buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
-      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-      var n = ctx.createBufferSource(); n.buffer = buf;
-      var lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1300;
-      var ng = ctx.createGain();
-      ng.gain.setValueAtTime(0.1, t);
-      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
-      n.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
-      n.start(t); n.stop(t + 0.26);
-      setTimeout(function () { try { ctx.close(); } catch (e) {} }, 1200);
-    } catch (e) { /* no audio here — the drop just plays silently */ }
+      var p = thud.play();
+      if (p && p.catch) p.catch(function () {});   // autoplay refused → stay silent
+    } catch (e) {}
   }, IMPACT_MS);
 })();
 </script>

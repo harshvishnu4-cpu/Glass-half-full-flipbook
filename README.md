@@ -142,11 +142,15 @@ back to the engine's starlit-night background.
 | the desk | `assets/table.png` — and re-make `table.webp` from it (the CSS loads the webp; the PNG is 14× heavier) |
 | how hard it lands | the `bookDrop` keyframes — `scale(2.35)` is the drop height, the `66%` stop is the impact |
 | the dust | the `<i>` elements in `.dust-burst` — `--x/--y` where a puff starts, `--dx/--dy` how far it drifts, `--s` its size, `--j` its delay |
-| the landing thud | the small `<script>` at the bottom of `index.html` — it synthesises the sound, so there's no file to swap |
+| the landing thud | swap `sfx/book-drop.wav`, or change its `volume` in the small `<script>` at the bottom of `index.html` |
 
 The thud is usually **silent on a first visit**: browsers don't allow sound
 until the reader has interacted with the page, and the book drops the moment the
 page loads. It plays on later visits. Nothing is broken when it doesn't sound.
+
+If you replace the sound, keep most of its energy **above ~190Hz**. Small
+speakers barely reproduce deep bass, so a thud that is mostly low rumble is
+inaudible no matter how far you turn it up.
 
 Two things to know if you move the dust: the closed book's board **overhangs the
 book area by about 48px**, so a puff placed at `--y:100%` is hidden *behind* the
@@ -172,6 +176,8 @@ assets/
   posters/pages/    ← first-frame stills, one per video (see Notes)
 sfx/
   BG Music.mp3      ← ★ your background music
+  book-drop.wav     ← the book landing on the table (cut from Book drop.mp3)
+  Book drop.mp3     ← ★ the full recording it was cut from; never loaded
   Page flip.mp3     ← page-turn sound (engine)
   cover page flip.mp3
 engine/           ← ⚙ the book itself — do NOT edit

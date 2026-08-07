@@ -54,6 +54,69 @@ a second.
 > genuinely emits sound (peak amplitude 0.29) by patching `AudioContext` to tap
 > the destination through an analyser, rather than just asserting no error.
 
+### Follow-up: "increase the drop sfx, it's unnoticeable"
+
+Two separate causes, and **volume was the smaller one**:
+
+1. **It is completely blocked on a cold load.** My first test ran Edge with
+   `--autoplay-policy=no-user-gesture-required`, which quietly guaranteed the
+   result. Re-run under the DEFAULT policy: **peak 0.0000, context
+   `suspended` throughout** — not quiet, not playing. *Lesson: never verify an
+   autoplay-sensitive feature under a flag that disables the very policy that
+   governs it.*
+2. **The sound was pitched where speakers can't reproduce it.** It was a
+   155→46Hz sine. Laptop and phone speakers roll off hard below ~150Hz, so even
+   when it played there was little left to hear. Rebuilt as four layers with
+   the loud ones in the audible band: a **520→190Hz triangle knock** (the layer
+   you actually hear), a **1.9kHz band-passed slap** transient, a deliberately
+   *quiet* 130→60Hz body (felt, not heard — turning it up only steals headroom),
+   and low-passed dust a beat later. All through one master bus at 0.62 so
+   nothing clips.
+
+Calibrated against sounds the reader demonstrably hears rather than against an
+absolute number: measured through the same analyser tap, the thud is
+**peak 0.67 / rms 0.020** versus the page flip's **0.078 / 0.0035** and the
+cover-open's **0.062 / 0.0016** — about 8.6× the flip's peak, which is right for
+an impact against a paper rustle. No clipping (peak < 1.0).
+
+The AudioContext is also now opened at page load rather than at the impact
+frame, giving it the full 760ms to wake; if it is still suspended at impact the
+thud is skipped rather than fired late and out of sync.
+
+**Still open for the author:** guaranteed sound on a first visit would mean
+moving the drop behind the reader's first tap, which changes the entrance. Not
+done unilaterally.
+
+### Follow-up: the author's own recording replaced the synth
+
+`sfx/Book drop.mp3` (freesound, 15.7s) turned out to hold **nine separate
+takes** — the ask was really "pick the good one". Detected each by onset and
+characterised it (attack, length, peak, energy split across <150Hz / 150Hz-4kHz
+/ >4kHz), then **plotted the waveforms**, which is what actually decided it:
+
+| take | verdict |
+|---|---|
+| 0.68s | clean single impact, but thin (peak 0.35) and half its energy is sub-bass |
+| 2.45s | scattered rustle, no impact |
+| 4.84s | double thump — lands then flops |
+| 8.19s | good hit, but trails into rustling |
+| **10.80s** | **chosen** — loudest (0.56), one clean impact, natural settle, 67% mid |
+| 13.62s | **83% mid-range, the best number of the nine — and it is pages riffling, not a drop** |
+
+That last row is the lesson: ranking on the summary statistic alone would have
+picked page-riffle. *Plot the waveform before trusting a spectral score.*
+
+Cut to **`sfx/book-drop.wav`** — 0.78s, mono, 73KB, 3ms/70ms fades so neither
+edge clicks, normalised to 0.95. Played from an **`<audio>` element, not
+fetch + Web Audio**: `fetch()` is blocked on `file://`, and this book must work
+when index.html is double-clicked. The full mp3 stays as the source and is never
+loaded; re-cut with a different take by changing `START` in `dropcut.js`.
+
+Level set to **0.55** — the file's rms is 10.9× the page-flip file's, so this
+lands at ~6× a page flip: clearly an impact, not a shock. Verified it fires at
+**766ms** against the 760ms landing frame, plays to completion, and — under the
+default autoplay policy — stays silent with no error rather than throwing.
+
 ---
 
 ## 2026-08-07 — the author's hand art, everywhere; tap cue moved onto the machine
