@@ -63,7 +63,7 @@ window.STORY = {
   //   playAt     : where it sits, as a % of the cover. Put it over a calm part of
   //                your cover art — here the cauldron's black belly, clear of the
   //                title, both characters and the bubbling juice.
-  playButton: "assets/play button.svg",
+  playButton: "assets/wish button.svg",
   playAt: { x: "50%", y: "77%" },
 
   // Looping background music (any file in sfx/). Remove this line for silence.

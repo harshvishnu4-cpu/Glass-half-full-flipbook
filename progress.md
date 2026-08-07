@@ -13,7 +13,33 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-06 (latest) — the table scene + the book-drop entrance
+## 2026-08-07 (latest) — new gold Play button
+
+The author supplied a new button (`Wish Frame.svg` from Figma) — same blob +
+web + ▶ language as the purple one, but **gold**, which now matches the desk's
+candle/wand trim and the cover's gold title. Saved as
+**`assets/wish button.svg`**; the old **`assets/play button.svg` was deleted**
+(author asked for it removed, not kept as a spare).
+
+Three references had to move together, and missing any one of them 404s the
+button: `story.js` → `playButton`, the hard-coded `src` on `.play-art` in
+`index.html` (the markup default, used before `story.js` is applied), and the
+README (both the code sample and the folder table). Nothing in `engine/`
+changed — it only places, sizes (168 book px) and breathes the artwork.
+
+*Note for next time:* the author re-exported **over the same filename** while I
+was mid-swap (`Wish Frame.svg`, 4354 → 11219 bytes, the second adding the web
+pattern). "Use these buttons now, not the first one" meant a NEW FILE AT THE OLD
+PATH, not a new path — so check the Downloads mtime/size, don't assume the
+attachment you already read is current.
+
+Verified: art loads (210×206 natural, into the 168px square box — a 2% squeeze,
+invisible), sits at 50%/79% of the cover on the cauldron's black belly, the book
+still opens, no failed requests for the deleted file.
+
+---
+
+## 2026-08-06 — the table scene + the book-drop entrance
 
 The book no longer floats on the engine's starlit-night gradient. It now lies on
 a **Halloween desk** (`assets/table.png` — purple wood, a candle top-left, a

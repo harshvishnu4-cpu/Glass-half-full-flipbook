@@ -24,7 +24,7 @@ This is the **only file you edit**. Set the cover, the music, and the pages:
 ```js
 window.STORY = {
   cover: "assets/my-cover.png",
-  playButton: "assets/play button.svg",   // the Play button artwork
+  playButton: "assets/wish button.svg",   // the Play button artwork
   playAt: { x: "50%", y: "77%" },         // where it sits on the cover
   music: "sfx/my-music.mp3",              // remove this line for a silent book
   pages: [ /* your pages … */ ]
@@ -158,7 +158,7 @@ story.js        ← ★ EDIT THIS: your pages, dialogues, cover, music
 README.md       ← this file
 assets/
   Cover page.jpg    ← ★ your cover (16:9)
-  play button.svg   ← ★ your Play button artwork
+  wish button.svg   ← ★ your Play button artwork
   table.png         ← ★ the desk the book lies on (table.webp is what loads)
   pages/            ← ★ your scene images & videos
   posters/pages/    ← first-frame stills, one per video (see Notes)
