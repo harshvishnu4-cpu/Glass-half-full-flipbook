@@ -1050,6 +1050,18 @@
   /* the "tap here" ring reuses the scene-tap look; never intercepts the tap */
   .pour-scene .pour-hint { position: absolute; pointer-events: none;
                            transition: opacity 300ms ease; }
+  /* …but the HAND is CENTRED on the POUR button here, not hung below it as it
+     is elsewhere. The shared cue points at big scenery, where a hand over the
+     target would hide it; POUR is a small disc, and a hand sitting under it
+     read as pointing at the machine's body instead of at the button. */
+  .pour-scene .pour-hint .scene-tap-hand {
+    width: 40%;                                 /* smaller, so "POUR" still reads */
+    animation: pourHandPress 1.6s ease-in-out infinite;
+  }
+  @keyframes pourHandPress {
+    0%, 100% { transform: translate(-50%, -44%) scale(1);    }
+    50%      { transform: translate(-50%, -56%) scale(0.93); }
+  }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the
      glass) — hidden until their word, then a springy pop-in. */
   .pour-scene .pour-pop {
@@ -1066,8 +1078,35 @@
     65%  { opacity: 1; transform: scale(1.08) rotate(2deg);  }
     100% { opacity: 1; transform: scale(1)    rotate(0deg);  }
   }
+  /* HERO sticker (`emphasis: true` in story.js — the "Full" reward itself):
+     a warm glow so it reads as lit up, and a gentle pulse that carries on after
+     the pop lands. The pulse is listed AFTER the pop and starts as the pop
+     ends, so it takes over `transform` cleanly instead of fighting it. */
+  .pour-scene .pour-pop-hero {
+    filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
+            drop-shadow(0 0 16px rgba(255, 201, 92, 0.85))
+            drop-shadow(0 0 34px rgba(255, 173, 51, 0.45));
+  }
+  .pour-scene .pour-pop-hero.show {
+    animation: pourPopIn 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+               pourPopPulse 1.5s ease-in-out 520ms infinite,
+               pourPopGlow  1.5s ease-in-out 520ms infinite;
+  }
+  @keyframes pourPopPulse {
+    0%, 100% { transform: scale(1)     rotate(0deg);    }
+    50%      { transform: scale(1.075) rotate(-1.4deg); }
+  }
+  @keyframes pourPopGlow {
+    0%, 100% { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
+                       drop-shadow(0 0 14px rgba(255, 201, 92, 0.7))
+                       drop-shadow(0 0 30px rgba(255, 173, 51, 0.35)); }
+    50%      { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.4))
+                       drop-shadow(0 0 22px rgba(255, 214, 122, 1))
+                       drop-shadow(0 0 48px rgba(255, 173, 51, 0.6)); }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .pour-scene .pour-pop.show { animation: none; opacity: 1; transform: none; }
+    .pour-scene .pour-pop.show,
+    .pour-scene .pour-pop-hero.show { animation: none; opacity: 1; transform: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .pour-scene .pour-stream.pouring { animation-duration: 0.4s; }

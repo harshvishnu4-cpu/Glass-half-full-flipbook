@@ -13,7 +13,106 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — new gold Play button
+## 2026-08-07 (latest) — five pour-scene fixes (author's list)
+
+**1. Hand nudge centred on POUR.** Measured it: the ring was already dead-centre
+on the button (dx 0.00%) but the *hand* sat **dx 1.85% / dy 9.04%** off — the
+shared `.scene-tap-hand` hangs below its ring by design, because elsewhere the
+cue points at big scenery a hand would cover. POUR is a small disc, so a hand
+below it read as pointing at the machine's body. Overrode it for `.pour-hint`
+only (`pourHandPress` keyframes, centred, 40% wide so "POUR" still reads).
+Now off by dx 0.00% / dy 0.17%.
+
+**2. Fuller glass.** `TOP_Y` 33 → **24**. In cup space the mouth's inner edge
+bottoms out at 24.3, so the surface now sits right under the lip and the rim —
+painted after the juice — tucks over it. Before, it stopped ~9 units short and
+read as three-quarters full at "full".
+
+**3. Continuous nudge while pouring.** `pour()` used to hide the hand on every
+tap and only re-show it after **9s idle** (from pour-interaction.md). Filling
+takes four taps, so the hand vanished after the first and the reader had no cue
+that more were wanted. It now stays up from arm until the glass is full, then
+hides (nothing left to tap). The idle timer is gone entirely — no dangling refs.
+
+**4. Machine aligned to the clip.** The big one. Page 6.mp4 ends on this same
+machine, so the cross-dissolve is only invisible if the pour machine lands
+exactly where the video leaves it — it didn't. Found the true fit by
+**template-matching `machine.webp` against the clip's final frame** (coarse 1%
+sweep over x/y/width, then a 0.25% refine; `fit.js`): match error **68.6 → 25.2**.
+The machine was **5.8% too far right, 3.8% too low and 6% too small** — it
+visibly jumped and shrank at the hand-off.
+`machineAt` is now `x 30.75% / y 7.75% / w 28.5%`, and **the same fit is applied
+to every attached part** (button, glass, stream, both stickers) via
+`new = 30.75 + (old − 36.56) × 1.0626`, so the composition the author approved
+is preserved exactly while the whole assembly moves onto the video's machine.
+Independent cross-check: the derived glass x (41.88%) matched the glass measured
+directly in the video frame (41.88%) to two decimals.
+
+**5. "Full" highlighted + pulsating.** New per-pop flag **`emphasis: true`**
+(story.js) → `.pour-pop-hero`: a warm gold glow plus `pourPopPulse` /
+`pourPopGlow` that start as the pop lands (listed after `pourPopIn` so they take
+over `transform`/`filter` cleanly) and keep going. Only the "Full" sticker gets
+it; the arrow just points.
+
+Verified (`pour5.js`): all five, plus the page still unlocks after the reward
+line, no errors. Full read-through clean.
+
+**Worth knowing — the clip ends on "Empty" + arrow.** The video's last frame
+already carries an "Empty" sticker and dashed arrow in the same style as our
+"Full" pair, in almost the same place. That's the largest remaining delta at
+the hand-off: they fade out during the 1.1s dissolve, then "Full" appears later
+in roughly their spot. Carrying an "Empty" sticker into the pour scene (fading
+it on the first tap) would make the join seamless, but there is **no
+`empty text.png` asset** — it would need new art from the author.
+
+---
+
+## 2026-08-07 — three replaced clips, and a casing bug that only breaks when hosted
+
+Author replaced **Page 2** (18.4s), **Page 5 part 2** (8.5s) and **Page 7**
+(8.2s, was 10.4s) in place. Replacing a clip in place is never just a file
+copy — four things ride on each one:
+
+**1. The filename case — the real bug.** The new page-2 export landed as
+**`page 2.mp4`** (lowercase p) while `story.js` and git both say `Page 2.mp4`.
+Windows is case-INSENSITIVE, so it plays perfectly here and looks completely
+fine — but **GitHub Pages is case-sensitive**, so the hosted book would 404 on
+page 2: a blank page that never unlocks, on the iPhone read this project exists
+for. Renamed back via a two-step (`page 2.mp4` → `.tmpcase` → `Page 2.mp4`;
+a direct case-only rename is a no-op on Windows), confirmed by git reporting it
+as *modified* rather than delete+add. **Check `cmd /c dir /b` against
+`git ls-files` after every asset drop** — Explorer and `Get-ChildItem` will not
+show you this.
+
+**2. Posters.** All 12 regenerated (`posters.js`); the three replaced clips had
+posters from the previous encode, which would flash the OLD first frame and jump
+the instant playback began. New check `posterdiff.js` draws poster and frame 0
+to canvas and reports mean per-pixel difference — everything now ≤3 (webp noise;
+a stale poster scores far higher). Worth running after any clip swap.
+
+**3. Cue timing tied to the clip.** Page 5 part 2 carries `tap.after`, and the
+new take's narration runs **0.8s→5.0s** with a **3.4s silent tail**. The old
+`4800` now fired over the last word. Measured the envelope (`envelope.js`,
+per-200ms RMS via `decodeAudioData`) and moved it to **5100** — verified the cue
+becomes visible at clip time **5.0s** exactly (`p5cue.js`, sampled against the
+video's own `currentTime`, not wall clock). Page 7 (1.2s tail) and Page 2
+(0.4s tail) gate on `ended`, so neither needed tuning.
+
+**4. Encoding.** All 12 re-checked for `moov` before `mdat` — all faststart, so
+they still stream progressively over HTTP instead of downloading whole.
+
+Also fixed the now-stale `// 10s` comment on Page 7. Geometry was fine: every
+clip is 1920×1080 / exactly 16:9, so nothing letterboxes in the 1280×720 frame.
+
+**Unrelated loose end:** `assets/pages/hand nudge.webp` (a drawn pointing hand,
+dated 08-04) is sitting untracked and unused. The engine wants
+`engine/hand-nudge.png` and falls back to an inline SVG hand, which is why the
+404 is harmless. Left alone — swapping the cue hand is a design call the author
+hasn't made.
+
+---
+
+## 2026-08-07 — new gold Play button
 
 The author supplied a new button (`Wish Frame.svg` from Figma) — same blob +
 web + ▶ language as the purple one, but **gold**, which now matches the desk's

@@ -106,7 +106,10 @@ window.STORY = {
           // anywhere: the cue is a tapping hand on open space — NOT a ring on
           // the machine's POUR button, which is part 4's job. A tap anywhere on
           // the screen continues (it always did; the hint now says so).
-          tap: { after: 4800, anywhere: true, at: { x: "27%", y: "62%" },
+          // after: the clip is 8.5s but its narration runs 0.8s→5.0s, so the cue
+          // comes up at 5.1s — the moment the line lands, not 3.4s later when
+          // the clip finally ends (and not at 4.8s, over the last word).
+          tap: { after: 5100, anywhere: true, at: { x: "27%", y: "62%" },
                  label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
     ] },
@@ -123,10 +126,19 @@ window.STORY = {
             bg:      "assets/pages/pour/bg.webp",
             machine: "assets/pages/pour/machine.webp",
             button:  "assets/pages/pour/pour-button.webp",
-            machineAt: { x: "36.56%", y: "11.57%", w: "26.82%" },
-            buttonAt:  { x: "46.82%", y: "49.81%", w: "5.78%"  },
-            glassAt:   { x: "47.03%", y: "66.11%", w: "5.94%"  },
-            stream: { x: "49.97%", top: "60%", h: "8%" },
+            // ── ALIGNED TO THE CLIP ──────────────────────────────────────────
+            // Page 6.mp4 ends on this same machine, so the cross-dissolve is
+            // only invisible if the machine lands EXACTLY where the video left
+            // it. These came from template-matching machine.webp against the
+            // clip's final frame (best fit of x/y/width); the old values had it
+            // 5.8% too far right, 3.8% too low and 6% too small, so the machine
+            // visibly jumped and shrank at the hand-off. Everything below is
+            // the same fit applied to each attached part, so the button, glass,
+            // stream and stickers keep their positions ON the machine.
+            machineAt: { x: "30.75%", y: "7.75%",  w: "28.50%" },
+            buttonAt:  { x: "41.65%", y: "48.39%", w: "6.14%"  },
+            glassAt:   { x: "41.88%", y: "65.71%", w: "6.31%"  },
+            stream: { x: "45%", top: "59.21%", h: "8.5%" },
             juice: "#F27FBE",
             taps: 4,
             sound: "sfx/pour.wav",       // pour SFX per tap
@@ -141,15 +153,17 @@ window.STORY = {
             // (both PNGs are square canvases with the art floating in ~66% of
             // the width — the w values are the CANVAS size, so the visible art
             // is about two-thirds of each w.)
+            // `emphasis` = this is the REWARD itself, so it gets a warm glow and
+            // keeps gently pulsing after it lands (the arrow just points).
             pops: [
               { src: "assets/pages/full text.png", time: 5400,
-                at: { x: "63%", y: "19%" }, w: "27%" },
+                at: { x: "58.85%", y: "15.65%" }, w: "28.69%", emphasis: true },
               { src: "assets/pages/pointer.png",   time: 5600,
-                at: { x: "51.5%", y: "37%" }, w: "32%" },
+                at: { x: "46.63%", y: "34.77%" }, w: "34%" },
             ],
         } },
     ] },
-    { type: "video", src: "assets/pages/Page 7.mp4"  },   // 10s
+    { type: "video", src: "assets/pages/Page 7.mp4"  },   // 8s
     { type: "video", src: "assets/pages/Page 8.mp4"  },   // 16s
     { type: "video", src: "assets/pages/Page 9.mp4"  },   // 31s
     { type: "video", src: "assets/pages/Page 10.mp4" },   // 15s

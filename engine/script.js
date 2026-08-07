@@ -336,7 +336,11 @@ function buildPourScene(layer, cfg) {
   const CUP_BACK  = "M113.88 14.1724C113.878 14.14 113.846 14.1086 113.818 14.1149C113.785 14.1159 113.759 14.1427 113.759 14.1755C113.759 15.7223 112.741 17.2462 110.732 18.7051C110.716 18.7162 110.707 18.7348 110.707 18.7543C110.829 35.4657 107.848 62.6342 102.527 93.2939C98.1242 118.663 93.0045 140.976 90.6178 145.196C87.1763 151.281 68.9366 154.018 57.0845 154.018C45.9934 154.018 27.8754 151.214 24.2098 145.196C22.0514 141.65 16.5042 118.101 11.8438 92.6996C5.99325 60.8075 2.88878 33.8171 3.32705 18.6489C3.32755 18.6294 3.31854 18.6108 3.30291 18.5989C1.38905 17.1722 0.418468 15.6842 0.418468 14.1755C0.418468 14.1433 0.392974 14.1166 0.360883 14.1149C0.333063 14.1157 0.300878 14.1379 0.298066 14.1699C-1.56856 33.7284 5.81325 78.6279 9.07409 97.0241C14.5699 128.033 21.2135 157.333 23.5812 161.004C25.7657 164.39 32.1125 166.418 37.0523 167.52C43.0035 168.85 50.3066 169.613 57.0889 169.613C70.7436 169.613 87.0536 166.918 90.5973 161.002C93.2207 156.622 99.4901 128.928 104.871 97.9538C107.954 80.2061 115.004 36.5139 113.88 14.1724Z";
   const CUP_RIM   = "M97.2109 4.13631C86.4913 1.46885 72.2396 0 57.0812 0C41.9235 0 27.6718 1.46923 16.9523 4.13631C6.20722 6.81009 0.290068 10.3758 0.290068 14.1771C0.290068 15.7257 1.27674 17.2467 3.22312 18.6973C10.97 24.4729 32.6142 28.3535 57.0812 28.3535C81.343 28.3535 102.93 24.5158 110.795 18.8041C112.837 17.3212 113.872 15.7646 113.872 14.1771C113.872 10.3758 107.956 6.81009 97.2109 4.13631Z";
   const CUP_MOUTH = "M19.096 21.0888C29.2388 23.1466 42.7238 24.2803 57.0671 24.2803C71.4102 24.2803 84.8951 23.1466 95.0377 21.0888C105.208 19.0249 110.81 16.2689 110.81 13.3273C110.81 10.3858 105.208 7.62922 95.0377 5.56567C84.8951 3.50767 71.41 2.37404 57.0671 2.37404C42.7238 2.37404 29.2388 3.50767 19.096 5.56567C8.92507 7.62922 3.32394 10.3858 3.32394 13.3273C3.32394 16.2689 8.92507 19.0249 19.096 21.0888Z";
-  const TOP_Y = 33, BOT_Y = 152;               // liquid surface y at 100% / 0% (cup space)
+  // Liquid surface y at 100% / 0%, in cup space. TOP_Y sits just under the
+  // mouth's inner edge (CUP_MOUTH bottoms out at 24.3) so a full glass reads
+  // FULL TO THE BRIM — the rim is painted after the juice, so the surface
+  // tucks under it instead of spilling over the lip.
+  const TOP_Y = 24, BOT_Y = 152;
   const at = function (o, dw) {                // config position → inline % styles
     return "left:" + (o && o.x || "0%") + ";top:" + (o && o.y || "0%") +
            ";width:" + (o && o.w || dw) + ";";
@@ -404,19 +408,20 @@ function buildPourScene(layer, cfg) {
     img.style.left = (pop.at && pop.at.x) || "50%";
     img.style.top  = (pop.at && pop.at.y) || "50%";
     img.style.width = pop.w || "12%";
+    // `emphasis` — the sticker that IS the reward: a warm glow + a gentle pulse
+    // that keeps going after it lands, so the eye stays on it.
+    if (pop.emphasis) img.classList.add("pour-pop-hero");
     layer.appendChild(img);
     return { el: img, time: pop.time || 0 };
   });
 
-  let fillPct = 0, complete = false, timers = [], idleTimer = null;
+  let fillPct = 0, complete = false, timers = [];
   const wait = function (fn, ms) { timers.push(setTimeout(fn, ms)); };
+  // The nudging hand stays up CONTINUOUSLY from the moment the scene arms until
+  // the glass is full — filling takes several taps and a hand that vanished
+  // after the first one left the reader unsure another was wanted. (It replaces
+  // the original 9s-idle re-arm from pour-interaction.md.)
   const showHint = function (on) { if (hintEl) hintEl.style.opacity = on ? "1" : "0"; };
-  function armIdleHint() {                     // md: re-arm after EVERY pour, so the
-    clearTimeout(idleTimer);                   // window always measures true idleness
-    idleTimer = setTimeout(function () {
-      if (!complete && !btn.disabled) showHint(true);
-    }, 9000);
-  }
   function setJuice(pct) {
     const f = Math.max(0, Math.min(1, pct / 100));
     const y = BOT_Y - f * (BOT_Y - TOP_Y);
@@ -428,8 +433,6 @@ function buildPourScene(layer, cfg) {
   }
   function pour() {
     if (complete || btn.disabled || fillPct >= 100) return;
-    showHint(false);
-    armIdleHint();
     btn.classList.add("pressed");              // touch gets the same feedback as :active
     wait(function () { btn.classList.remove("pressed"); }, 140);
     if (sound) {                               // every play() catch-wrapped (autoplay policies)
@@ -448,7 +451,7 @@ function buildPourScene(layer, cfg) {
     if (fillPct >= 100) {                      // full = locked, permanently (allowPour rule)
       complete = true;
       btn.disabled = true;
-      clearTimeout(idleTimer);
+      showHint(false);                         // nothing left to tap → the hand goes
       const finish = function () { if (layer._pourDone) layer._pourDone(); };
       if (fullSound) {
         // Let the last stream fade and the liquid settle, then the spoken reward
@@ -500,11 +503,9 @@ function buildPourScene(layer, cfg) {
     if (complete) { if (layer._pourDone) layer._pourDone(); return; }
     btn.disabled = false;
     showHint(true);                            // no narration introduces POUR — the ring does
-    armIdleHint();
   };
   layer._pourReset = function () {             // leaving the page → empty glass next visit
     timers.forEach(clearTimeout); timers = [];
-    clearTimeout(idleTimer);
     fillPct = 0; complete = false;
     btn.disabled = true;
     btn.classList.remove("pressed");
