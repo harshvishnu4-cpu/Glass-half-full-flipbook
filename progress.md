@@ -13,7 +13,57 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the new desk art, and a bug sweep
+## 2026-08-10 (latest) — the new Play button (and the engine stopped squashing it)
+
+`assets/play button.svg` — an orange cobweb disc with a white play triangle and
+gold sparkles — replaces `assets/wish button.svg` on the cover. Both references
+updated, as the swap needs: **`playButton` in story.js** (the authority, read into
+`art.src` at load) and **the hard-coded fallback `src` in index.html**, which must
+match or the pre-script paint shows the wrong art for a frame.
+
+### It would have shipped visibly distorted
+
+`.play-btn` is a **square** 168px tap target and `.play-art` was
+`width:100%; height:100%` with **no `object-fit`** — so the default `fill`
+stretches the art to the box. The old button was 210×206 (aspect 1.019), so the
+1.9% distortion never showed. **The new one is 214×194 — aspect 1.103** — and would
+have been stretched about 10% too tall.
+
+Added **`object-fit: contain`**. The engine's own comment says the button "is
+whatever the story's illustrator drew; the engine only places, sizes and animates
+it", so reshaping it contradicted the stated contract. Now any aspect works.
+
+Two things checked before making that change rather than after:
+
+- **The tap target does not shrink.** `tapHitsPlay()` measures the BUTTON's
+  bounding box, not the art, so letterboxing the image leaves the hit-circle at
+  the full 170px. Verified by firing a click on the tap-catcher 6px inside the
+  circle's edge on the diagonal — outside the letterboxed art — and the book
+  opened.
+- **Nothing moved.** Swapping the `src` back and forth in a live page changed the
+  button box by `{dl:0, dt:0, dw:0, dh:0}`.
+
+The visible art is now 169.7×153.9 rather than filling 170×170, so the button
+reads very slightly shorter than the old one. That is the undistorted shape; if a
+bigger button is wanted, `.play-btn`'s 168px is the knob.
+
+### A false failure worth recording
+
+My first check reported the button 2.19% below `playAt` (79.19% vs 77%). It is
+exactly right: **`--play-y` is a percentage of the button's OFFSET PARENT**
+(`.face.front`), and I had measured against `.cover-img`, a different box. Measured
+against the offset parent it is **50% / 77%**, dead on. Always resolve a
+percentage against the box the browser resolves it against.
+
+Verified: both references point at the new file, nothing 404s, drawn aspect 1.103
+matches the natural 1.103, tap target 170×170, position 50%/77%, still breathing
+(`playBreathe`), a hit-circle tap opens the book, and the read-through is clean
+with `errors: (none)`. `assets/wish button.svg` is left in place, unused — say the
+word and it goes.
+
+---
+
+## 2026-08-10 — the new desk art, and a bug sweep
 
 Author: "I've updated the new table, use it in the book background — and check for
 bugs, fix all the bugs."

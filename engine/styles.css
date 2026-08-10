@@ -754,6 +754,12 @@
   }
   .play-btn .play-art {
     width: 100%; height: 100%; display: block;
+    /* The tap target is a SQUARE, but the story's button art need not be: this
+       one is 214x194. Without `contain` the image is stretched to fill the square
+       and the disc comes out ~10% too tall — the engine is supposed to place and
+       size whatever the illustrator drew, not reshape it. The hit area is
+       unaffected: tapHitsPlay() measures the BUTTON box, not the art. */
+    object-fit: contain;
     filter: drop-shadow(0 9px 14px rgba(6, 4, 26, 0.55));
     -webkit-user-drag: none; user-drag: none;
   }

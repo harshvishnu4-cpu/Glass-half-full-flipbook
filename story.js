@@ -63,7 +63,7 @@ window.STORY = {
   //   playAt     : where it sits, as a % of the cover. Put it over a calm part of
   //                your cover art — here the cauldron's black belly, clear of the
   //                title, both characters and the bubbling juice.
-  playButton: "assets/wish button.svg",
+  playButton: "assets/play button.svg",
   playAt: { x: "50%", y: "77%" },
 
   // The pointing hand for the cues that point INTO a page's illustration — the
