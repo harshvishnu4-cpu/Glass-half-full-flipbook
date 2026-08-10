@@ -13,7 +13,90 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — a "press me" effect on the Play button
+## 2026-08-10 (latest) — a pop on the Play button, and a full read-through
+
+### The pop
+
+The engine already had a synthesized pop (`playPopSfx`, a sine blip) for the pour
+page's sticker reveals. The Play button now fires it too, from **inside
+`openBook()`** rather than the button's own click handler — that way every route in
+gets it: the button, a tap on the tap-catcher inside the hit-circle, and
+Enter/Space on the focused button all arrive through `openBook()`.
+
+`playPopSfx` gained an optional `opts` so a caller can shift its character without
+touching the defaults. The button uses **660→210Hz at 0.4** against the sticker's
+520→160Hz at 0.5 — brighter, so a press does not sound like a sticker landing, and
+quieter, so it does not bury the cover swoosh that follows it a moment later.
+Rendered offline to check rather than guessed: button peak 0.39 / rms 0.0392,
+sticker peak 0.4778 / rms 0.0484.
+
+**The real find was a suspended-clock bug.** `resume()` is asynchronous, and a
+suspended AudioContext has a FROZEN clock — so scheduling the envelope against
+`currentTime` inside the same gesture put the whole pop behind a clock that had not
+started. Instrumenting `createOscillator` showed `ctxStateAtStart: "suspended"` on
+the very first press, which is the one press that matters: the button's pop is the
+first sound of the session. Now it resumes first and schedules in the promise
+callback; the same probe reports `running`. Tested under the REAL autoplay policy
+(no `--autoplay-policy` override), because overriding it is what makes this class
+of bug invisible. The sticker pops take the fast synchronous path — verified still
+firing `520→160@0.5`, twice, on the pour reward.
+
+### The read-through — one real bug
+
+Read all 11 pages as a reader, capturing 30 frames and checking each for blank,
+flat or near-black output, plus console errors, failed requests and every cue.
+
+**Bug found and fixed: `sfx/book-drop.wav` and `sfx/Book drop.mp3` had been deleted**
+(the sfx folder's mtime was minutes old) while `index.html:328` still loads the wav
+— so the book-drop thud was silent and every single load logged
+`net::ERR_FILE_NOT_FOUND`. Restored from HEAD; the thud now reports
+`readyState 4, dur 0.78s, err null` and a plain load has **zero failed requests**.
+
+That one slipped past my own audit, so the audit is fixed too: it only matched
+`url()`, `src=` and `href=`, and this reference is **`new Audio("sfx/book-drop.wav")`**.
+Now 29 references are checked instead of 26.
+
+Everything else was clean: all 11 pages render correctly, no blank/black frames,
+the page-5 tap and the 4-tap pour both work, the pour reward lands with "Full" +
+the pointer, page 8 shows the fixed caption, THE END renders with "Read again", and
+replay returns to the closed cover with the Play button back.
+
+### Three findings that were my instruments, not the book
+
+Recording these because each looked like a serious bug for a while:
+
+- **"the cover art did not load"** — `.cover-img` is a **DIV with a
+  background-image** set inline by script.js, not an `<img>`, so `.complete` and
+  `.src` were meaningless. It is fine: inline `url("assets/Cover%20page.jpg")`,
+  decoding at 1920×1080.
+- **`ERR_FILE_NOT_FOUND` on eight clips** — the console showed one generic
+  message and my probe grouped it with eight `requestfailed` entries for
+  `Page 3..10.mp4`. Logging the full URL and failure text showed all eight are
+  **`net::ERR_ABORTED`**: the browser cancelling media fetches when the engine
+  pauses every non-current clip. Benign and expected. Only `book-drop.wav` was a
+  real `FILE_NOT_FOUND`. My probe even printed "on disk? YES — so the URL is
+  malformed", which is a wrong inference baked into a test: aborted ≠ malformed.
+- **"no page media found to sample" on every page** — the selector was scoped
+  under `.book-frame` and matched `.page-scene.on` across the whole document, so it
+  picked scenes off leaves that were not in front. The front page is the first
+  `.leaf:not(.flipped)`. (Two of those warnings survive and are correct: THE END
+  has no media to sample.)
+
+### For the author to decide
+
+- **`dev/dev-menu.js` is still loaded** (index.html:343) and its hamburger renders
+  at 44×44 in the top-left of every screen, cover included — it is in all 30
+  captured frames. It was built to be deleted when the book is done. Left in place
+  because the book is clearly still being authored and the menu is the page-jump
+  tool for that; deleting is one line when you are finished.
+- **Unused assets:** `assets/wish button.svg` and `assets/audios/page 5 part 2.wav`
+  are now referenced by nothing (0 files).
+- **`Page 4.mp4`** is still the pre-08-10 export; the re-recorded narration you
+  committed is in Downloads as `Page 4 (2).mp4`. Identical picture and duration.
+
+---
+
+## 2026-08-10 — a "press me" effect on the Play button
 
 Author: "add some special effect on play button." Three parts, all pure CSS, no
 markup and no JS:

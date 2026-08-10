@@ -1781,6 +1781,12 @@ function runOpenSequence() {
   // A user gesture drives every open, so start audio here.
   soundOn();
   resumeAudio();
+  // The BUTTON's own sound, before the cover's: a press should be answered
+  // instantly, and the paper swoosh belongs to the cover that follows. Fired here
+  // rather than on the button's click handler so every route in gets it — the
+  // button, a tap on the catcher inside the hit-circle, and Enter/Space on the
+  // focused button all arrive through openBook().
+  playPopSfx({ from: 660, to: 210, gain: 0.4 });
   playCoverFlip();
   playBgMusic();                        // start the looping background music
   primeVideo(flipped); primeVideo(flipped + 1);   // unlock the landing page + next inside the gesture
@@ -2336,24 +2342,45 @@ function playSfx(name, vol, rate) {
 }
 
 // Page-flip sound — snappy 1.5× on every ordinary flip.
-/* A tiny synthesized POP for sticker reveals — a sine blip whose pitch falls
-   520→160Hz over ~120ms. Web Audio, no asset file, glitch-free at any rate of
-   fire; silently absent when the ctx is unavailable or the book is muted. */
-function playPopSfx() {
+/* A tiny synthesized POP — a sine blip whose pitch falls over ~120ms. Web Audio,
+   no asset file, glitch-free at any rate of fire; silently absent when the ctx is
+   unavailable or the book is muted.
+   Defaults (520→160Hz, 0.5) are the STICKER reveal on the pour page. `opts` lets
+   a caller shift its character without touching those: the Play button uses a
+   brighter, slightly quieter 660→210Hz so a button press doesn't sound like a
+   sticker landing, and doesn't bury the cover swoosh that follows it. */
+function playPopSfx(opts) {
   if (!audioCtx || muted) return;
-  try {
-    const t = audioCtx.currentTime;
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = "sine";
-    o.frequency.setValueAtTime(520, t);
-    o.frequency.exponentialRampToValueAtTime(160, t + 0.12);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.012);   // fast attack = the "p"
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); // quick decay = the "op"
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(t); o.stop(t + 0.18);
-  } catch (_) {}
+  const o0 = (opts && opts.from) || 520;
+  const o1 = (opts && opts.to)   || 160;
+  const pk = (opts && opts.gain) || 0.5;
+  const fire = function () {
+    try {
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(o0, t);
+      o.frequency.exponentialRampToValueAtTime(o1, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(pk, t + 0.012);    // fast attack = the "p"
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); // quick decay = the "op"
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.18);
+    } catch (_) {}
+  };
+  // A SUSPENDED context has a frozen clock, so an envelope scheduled against
+  // currentTime before the resume lands can be skipped when the clock jumps
+  // forward — which is exactly the case for the Play button, whose pop is the
+  // first sound of the session. Resume FIRST, then schedule against a running
+  // clock. The sticker pops take the fast path: by then it is already running.
+  if (audioCtx.state === "suspended") {
+    try {
+      const p = audioCtx.resume();
+      if (p && p.then) { p.then(fire, fire); return; }
+    } catch (_) {}
+  }
+  fire();
 }
 
 function playFlip() {
