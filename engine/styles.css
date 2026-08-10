@@ -529,8 +529,15 @@
     border-radius: 0 0 10px 10px;
     box-shadow: inset 0 -5px 8px rgba(96,66,24,0.35);
   }
+  /* right: was -10px, which pushed the lip ~6px PAST the front cover's right
+     edge. Because the lip starts above the cover's bottom edge and is a lighter
+     purple than the board, that overhang read as a bright step jutting out of
+     the book's bottom-right corner. The lip must never be wider than the front
+     cover — it is the BACK cover, behind it — so it is now inset symmetrically
+     with `left`, and still pokes out well past the page stack (inset 14px),
+     which is the layering this was after: pages < back lip < front cover. */
   .pageblock .pb-back-lip {
-    position: absolute; left: 2px; right: -10px; bottom: -40px; height: 52px;
+    position: absolute; left: 2px; right: 2px; bottom: -40px; height: 52px;
     transform: translateZ(-8px);
     background: linear-gradient(90deg, #40317f 0%, #352868 55%, #271e50 100%);
     border-radius: 4px 4px 14px 14px;

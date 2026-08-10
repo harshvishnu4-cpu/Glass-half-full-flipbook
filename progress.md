@@ -13,7 +13,44 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-07 (latest) — the tap-to-begin gate was REVERTED
+## 2026-08-10 (latest) — the step jutting out of the book's bottom-right corner
+
+Author spotted a bright tab poking out of the closed book's bottom-right. Cause:
+**`.pb-back-lip` had `right: -10px`**, so the back-cover lip painted ~6px PAST
+the front cover's right edge. Because the lip starts *above* the cover's bottom
+edge (its top is at cover.bottom − 23px) and is a lighter purple than the board
+(`#271e50` against the cover's `#241b46` there), that overhang read as a bright
+step with its own 14px rounded corner. Fixed by making the lip symmetric —
+`right: 2px`, matching `left: 2px`. It is the BACK cover, so it must never be
+wider than the front one; it still sits 7.6px proud of the page stack and still
+peeks 33.6px below the cover, which is the layering the effect wanted
+(pages < back lip < front cover).
+
+**Two false trails, both killed by measuring instead of looking:**
+
+- I first blamed `.book-body` from a side-by-side of hidden-element renders —
+  it *looked* like the culprit. A quantitative diff said otherwise: hiding it
+  changes **0%** of those pixels, and its computed opacity is already 0. Eyeball
+  A/B of near-identical crops is not evidence; diff them.
+- The bounding rects said the lip was 7.2px *inside* the cover, which
+  contradicted the screenshot. Sampling actual pixels showed why: the cover's
+  **painted** right edge is ~1505 while its bounding rect claims 1518 — so rects
+  alone would have "proved" there was no bug. The pixel scan found the lip's
+  colour sitting to the right of the cover's, which is the real defect.
+
+*Test-writing notes:* `getBoundingClientRect()` returns a DOMRect, which has no
+own enumerable properties and serialises out of `page.evaluate` as `{}` — build
+`{l,r,t,b}` explicitly. And when both metrics are phrased as "beyond the cover",
+*both* pass at `<= 0`; I initially asserted `>= 0` on the left and got a false
+failure on correct code.
+
+Verified: no lip-coloured pixels remain right of the cover (0 px), the lip is
+inset 20.3px on both sides, still wider than the page stack, still peeking
+below; clean across all 10 viewports; full read-through clean.
+
+---
+
+## 2026-08-07 — the tap-to-begin gate was REVERTED
 
 Author: "no need to add tap to begin text or interaction." The gate below is
 **gone** — no prompt, no extra tap, the book drops on load exactly as before,
