@@ -13,7 +13,83 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — a pop on the Play button, and a full read-through
+## 2026-08-10 (latest) — the load glitch: the book flashed at HALF SIZE
+
+Author: "there is a glitch when the flipbook loads." There was, and it is fixed —
+but three plausible-looking diagnoses had to be **disproved** first, which is the
+real lesson of this entry.
+
+### The actual bug
+
+`.flip-scale` is a fixed 1280×720 layer scaled to fit:
+`transform: … scale(var(--book-scale, 0.5))`. `fitScale()` sets `--book-scale`
+when `engine/script.js` runs, at the end of `<body>` — so until then the CSS
+**fallback of 0.5** applies.
+
+Recording the load at 1280×720 and measuring the book's painted width in every
+composited frame: **7 consecutive frames at 756px, then a jump to 1272px at
+231ms.** A ~68% size snap, on screen for about a fifth of a second, right on top of
+the drop — which is exactly why it reads as a glitch rather than as a resize.
+
+Fixed by never letting that fallback paint. In `<head>` (it has to be there — a
+rule arriving with a stylesheet lower down is already too late for the first paint):
+
+    html:not(.book-fitted) #flipScale { visibility: hidden }
+    html:not(.book-fitted) #bookPop   { animation-play-state: paused }
+
+and `fitScale()` adds `book-fitted` on its first run. The drop is *paused* as well
+as hidden, so it plays in full rather than starting behind a hidden book and
+appearing mid-fall. `engine/script.js` runs before the inline drop-sfx script, so
+the thud's 760ms timer still lines up — verified: the impact squash still peaks at
+~760ms. Plus a 1500ms head-script safety net, because a blank desk would be a worse
+failure than a mis-sized book: with `engine/script.js` blocked entirely the book
+still appears.
+
+After: **0 frames narrower than 820px** (was 7). Gate opens on all six sizes
+(scale 1.2 → 0.3472), read-through clean.
+
+### Two other head changes, made for robustness rather than for this bug
+
+- **`html{background:#241137}`** inline and before every stylesheet. `html` had no
+  background of its own, so the canvas colour depended on propagation from `body`
+  once the big stylesheet had parsed.
+- **The Google Fonts stylesheet is now non-blocking** (`media="print"` +
+  `onload` swap, `<noscript>` fallback). It sat ABOVE `engine/styles.css` in the
+  head, so the first paint was gated on a network round trip — wrong for a book
+  meant to work when index.html is double-clicked. Verified the book still paints
+  with `fonts.googleapis.com` hanging, and that the swap really fires: the link
+  ends at `media="all"`, its sheet applies, and Fredoka + Patrick Hand load.
+
+### Three wrong diagnoses, and why each one fooled me
+
+Worth keeping, because each looked convincing and two were *my instruments*:
+
+- **"The book falls before its cover art arrives."** The marks said
+  `bookDrop animation begins` at 31ms and `cover url set` at 488ms. Wrong
+  comparison: the first mark fires when the animation OBJECT exists, not when its
+  clock starts. Sampling the animation's own `currentTime` showed the art is
+  present at **0–2% of the fall**, with **0** blank-cover frames.
+- **"A white flash for 1.5s."** A video recording showed 19 white frames. That is
+  Playwright's own `about:blank` **pre-roll** — `recordVideo` starts when the
+  context is created, before `goto`. I then "A/B tested" the fix with
+  `page.screenshot()`, which **awaits a paint** and therefore can never capture a
+  pre-paint frame; it reported 0/3 white both with and without the fix, proving
+  nothing either way.
+- **"The book is off-centre."** `.book-frame`'s rect is 5–13px asymmetric — but
+  that is the page block and lip sticking out on the right, not the book. A
+  pixel scan then said 42px off at 1920×1080, which was the desk's own candle and
+  spellbooks being counted as book pixels. Diffing the page against itself with
+  the book hidden — a mask that is *only* the book — gives margins equal to
+  **within 1px on all six sizes.**
+
+The through-line: **a computed value is not a composited pixel.** Every honest
+answer here came from measuring what was actually painted — the recorded frames for
+the snap, the animation's own clock for the drop, a hide-and-diff mask for the
+centring.
+
+---
+
+## 2026-08-10 — a pop on the Play button, and a full read-through
 
 ### The pop
 

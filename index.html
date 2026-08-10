@@ -21,14 +21,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Glass-half-full-flipbook</title>
 
+<!-- FIRST PAINT: the deep plum of the desk, inline and before every other
+     stylesheet, so the browser has something to paint the instant it starts.
+     Without this `html` has no background of its own and the reader watches
+     browser-default WHITE until the first paint — which was measured at 584ms,
+     a very visible flash, and longer still on a slow connection. -->
+<style>
+  html{background:#241137}
+  /* NO HALF-SIZE FLASH. The book is a fixed 1280x720 layer scaled to fit by
+     `--book-scale`, which fitScale() sets when engine/script.js runs. Until then
+     the CSS fallback of 0.5 applies — and it is genuinely COMPOSITED, not just
+     computed: recording the load at 1280x720 caught 7 frames with the book
+     756px wide before it snapped to 1272px, a ~68% jump about 200ms in. So keep
+     the book unpainted, and its drop paused, until the real scale is in. This
+     has to live here in <head> — a rule that arrives with a stylesheet lower
+     down is already too late to stop the first paint. */
+  html:not(.book-fitted) #flipScale { visibility: hidden }
+  html:not(.book-fitted) #bookPop   { animation-play-state: paused }
+</style>
+<script>
+  // Safety net: a blank desk is a worse failure than a mis-sized book, so if the
+  // engine never reports a fit, reveal it anyway.
+  setTimeout(function () { document.documentElement.classList.add("book-fitted"); }, 1500);
+</script>
+
 <!-- ── Google Fonts: Fredoka (headings) + Poppins (dialogue text — LXD rule)
-     + Patrick Hand & Caveat ── -->
+     + Patrick Hand & Caveat ──
+     Loaded NON-BLOCKING (media="print" until it arrives, then swapped to all).
+     As a plain stylesheet this sat above engine/styles.css and gated the first
+     paint on a NETWORK ROUND TRIP — and this book is meant to work when
+     index.html is double-clicked, where that request may be slow or never
+     resolve at all. The URL already carries `display=swap`, so text renders in a
+     fallback face and swaps when the webfont lands. -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
   href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fredoka:wght@500;600;700&family=Patrick+Hand&family=Poppins:wght@600;700&display=swap"
-  rel="stylesheet"
+  rel="stylesheet" media="print" onload="this.media='all'"
 />
+<noscript>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fredoka:wght@500;600;700&family=Patrick+Hand&family=Poppins:wght@600;700&display=swap"
+    rel="stylesheet"
+  />
+</noscript>
 
 <!-- Book styling / theme (engine — do not edit) -->
 <link rel="stylesheet" href="engine/styles.css" />

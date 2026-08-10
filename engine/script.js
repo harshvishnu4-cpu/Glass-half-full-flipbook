@@ -1053,6 +1053,10 @@ function fitScale() {
   const availH = Math.min(vh * (vh < 480 ? 0.86 : 0.80), vh - CTRL * 2);
   const s = Math.min(availW / 1280, availH / 720);
   flipScaleEl.style.setProperty("--book-scale", s.toFixed(4));
+  // The real scale is in — let the book paint and let its drop run. index.html
+  // holds both back until this class lands, so the CSS fallback scale of 0.5 is
+  // never composited (it used to be, for ~200ms, as a visible size snap).
+  document.documentElement.classList.add("book-fitted");
   // The nav arrows sit UNDER the book's bottom corners: BACK below the
   // bottom-LEFT corner, NEXT below the bottom-RIGHT — horizontally centred
   // on each corner, with the arrow art fully BELOW the book edge (never
