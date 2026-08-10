@@ -309,8 +309,13 @@ function makeFx(fx, layer) {
    to reveal it — animated via a transform transition, which unlike the `y`
    geometry property animates everywhere, Safari included.
    Config (story.js): { bg, machine, button, machineAt, buttonAt, glassAt,
-     stream:{x,top,h}, juice, taps, sound } — positions in % of the page, so
-   the whole scene rides the book's one responsive scale.
+     stream:{x,top,h}, juice, taps, sound, promptSound, fullSound, pops }
+   — positions in % of the page, so the whole scene rides the book's one
+   responsive scale.
+   The three sounds mark the three beats: `promptSound` is the spoken
+   instruction, and the button STAYS DEAD until it finishes; `sound` is the
+   per-tap pour; `fullSound` is the reward line, and the page hands back only
+   once it has been heard.
    The scene player arms it when the scene lands (layer._pourArm), completion
    reports back through layer._pourDone, and resetScenes calls layer._pourReset
    so a revisit starts with an empty glass. */
@@ -432,6 +437,11 @@ function buildPourScene(layer, cfg) {
   const sound   = cfg.sound ? new Audio(encodeURI(cfg.sound)) : null;
   if (sound) sound.preload = "auto";
   layer._pourSound = sound;                    // exposed for the headless tests
+  // Spoken PROMPT that introduces the button ("Tap the button to pour juice").
+  // It plays as the scene lands and GATES the interaction: see layer._pourArm.
+  const promptSound = cfg.promptSound ? new Audio(encodeURI(cfg.promptSound)) : null;
+  if (promptSound) promptSound.preload = "auto";
+  layer._pourPromptSound = promptSound;        // exposed for the headless tests
   // Spoken reward once the glass is FULL ("This glass is filled all the way up…").
   const fullSound = cfg.fullSound ? new Audio(encodeURI(cfg.fullSound)) : null;
   if (fullSound) fullSound.preload = "auto";
@@ -545,8 +555,30 @@ function buildPourScene(layer, cfg) {
 
   layer._pourArm = function () {               // the scene has landed → the reader may pour
     if (complete) { if (layer._pourDone) layer._pourDone(); return; }
-    btn.disabled = false;
-    showHint(true);                            // no narration introduces POUR — the ring does
+    const openUp = function () { btn.disabled = false; showHint(true); };
+    if (!promptSound) { openUp(); return; }    // no prompt configured → the ring introduces POUR
+    // The prompt NAMES the button, so it is heard FIRST and nothing is tappable
+    // over it: the button stays dead and the nudging hand stays hidden until the
+    // line ends. A hand pressing a button that ignores taps teaches the wrong
+    // thing, and a child who taps through the instruction never hears it.
+    btn.disabled = true;
+    showHint(false);
+    duckMusic(true);                           // narration over the music, as everywhere else
+    let opened = false;
+    const open = function () {
+      if (opened) return; opened = true;       // 'ended' and the backstop must not both fire
+      duckMusic(false);
+      openUp();
+    };
+    promptSound.onended = open;                // assignment, so a revisit never stacks listeners
+    try {
+      promptSound.currentTime = 0;
+      const p = promptSound.play();
+      if (p && p.catch) p.catch(function () { open(); });   // blocked → don't trap the reader
+    } catch (_) { open(); }
+    // A line that never fires `ended` (decode failure, tab throttling) must not
+    // leave the page unpourable — open anyway just after it should have finished.
+    timers.push(setTimeout(open, ((promptSound.duration || 4) * 1000) + 1200));
   };
   layer._pourReset = function () {             // leaving the page → empty glass next visit
     timers.forEach(clearTimeout); timers = [];
@@ -556,6 +588,7 @@ function buildPourScene(layer, cfg) {
     streamEl.classList.remove("pouring");
     showHint(false);
     if (sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
+    if (promptSound) { try { promptSound.onended = null; promptSound.pause(); promptSound.currentTime = 0; } catch (_) {} }
     if (fullSound) { try { fullSound.onended = null; fullSound.pause(); fullSound.currentTime = 0; } catch (_) {} }
     popEls.forEach(function (pop) { pop.el.classList.remove("show"); });   // stickers re-hidden
     layer.querySelectorAll(".pour-splash").forEach(function (d) { d.remove(); });

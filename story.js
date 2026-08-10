@@ -92,7 +92,7 @@ window.STORY = {
      ──────────────────────────────────────────────────────────────────────── */
   pages: [
     { type: "video", src: "assets/pages/Page 1.mp4"  },   // 11s
-    { type: "video", src: "assets/pages/Page 2.mp4"  },   // 18s
+    { type: "video", src: "assets/pages/Page 2.mp4"  },   // 17s
     { type: "video", src: "assets/pages/Page 3.mp4"  },   // 24s
     { type: "video", src: "assets/pages/Page 4.mp4"  },   // 16s
 
@@ -153,6 +153,11 @@ window.STORY = {
             stream: { x: "45%", top: "59.21%", h: "8.5%" },
             juice: "#F27FBE",
             taps: 4,
+            // "Tap the button to pour juice." — spoken as the scene arrives, and
+            // the POUR button is DEAD until it finishes, so the instruction is
+            // always heard before the first tap. Remove this line and the button
+            // is live immediately, introduced only by the ring + hand.
+            promptSound: "assets/audios/Tap the button to pour juice1.mp3",
             sound: "sfx/pour.wav",       // pour SFX per tap
             fullSound: "sfx/glass-full.wav",   // "This glass is filled all the way
                                      // up. It is full." — spoken once the glass

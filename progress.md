@@ -13,7 +13,73 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — Page 6 + Page 8 replaced; nothing needed retiming
+## 2026-08-10 (latest) — the POUR button waits for its spoken instruction
+
+Author added `assets/audios/Tap the button to pour juice1.mp3` and asked that the
+button only become tappable once the line has finished.
+
+New pour option **`promptSound`**, wired exactly like `fullSound` so the scene's
+three sounds now mark its three beats:
+
+| option | when | what it gates |
+|---|---|---|
+| `promptSound` | the scene lands | the button is DEAD until it ends |
+| `sound` | each tap | nothing |
+| `fullSound` | glass full | the page hands back only after it |
+
+`layer._pourArm` used to enable the button and raise the hand immediately. It now
+holds **both** back — button `disabled`, hand at opacity 0 — plays the line with
+`duckMusic(true)`, and opens up on `ended`. Hiding the hand matters as much as
+disabling the button: a hand pressing a control that ignores taps teaches the
+wrong thing, and a child who taps through the instruction never hears it.
+
+Three details that keep it from trapping the reader:
+
+- `open()` is idempotent (`opened` flag) so `ended` and the backstop can't both fire.
+- `play()`'s rejection calls `open()` — if the browser blocks the audio the page
+  must still be pourable, silently.
+- A backstop timer at `duration + 1200ms` (≈4.1s for this 2.93s line) covers a
+  line that never fires `ended` at all. It uses the metadata duration, falling
+  back to 4s while `duration` is still `NaN`.
+
+`_pourReset` clears the prompt too, so a revisit replays it from the start.
+
+Verified on the real page: button `disabled` and hand at opacity 0 the moment the
+scene arms, **31/31 samples dead through the whole line**, two clicks over it pour
+nothing, the button opens at 4380ms (1.1s cross-dissolve + the 2.93s line, so the
+line starts after the machine has fully arrived — not under the fade), the hand
+reaches opacity 1 right behind it, and 4 taps still fill the glass. Read-through
+clean.
+
+**The prompt's level is right** — and my first measurement said otherwise. Peak
+0.89, loud-half RMS 0.114, against 0.86/0.099 for the reward line and 0.99/0.095
+for Page 6's baked narration, so it is a touch louder than everything around it.
+An earlier script reported "peak 0.1847" and I nearly went looking for a way to
+boost it: that number was the peak of the **50ms-RMS envelope**, not of the
+samples. Two different quantities, one name. (Page 7's narration is the real
+outlier at peak 0.338 / loud-RMS 0.037 — about a quarter of every other page.
+Author's call, not touched.)
+
+### Page 2 and Page 4 were replaced at the same time
+
+Same protocol as Page 6/8 — old-vs-new frames plus decoded PCM:
+
+- **Page 2 — re-cut shorter: 18.376s → 17.441s**, audio changed from 5.66s on.
+  `story.js` comment updated `// 18s` → `// 17s`. The frame divergence its tail
+  shows is expected: comparing two different-length clips at the same absolute
+  timestamps is not comparing the same moment.
+- **Page 4 — audio only.** Picture identical at all 17 sampled frames, duration
+  unchanged, audio differs from 0.06s: the narration was re-recorded.
+
+Both are plain `{ type: "video" }` pages whose turn cue arms on `ended`, so a
+shorter clip just arms the cue sooner — nothing was timed against either length.
+All twelve posters still match frame 0 (0.56–1.2%, the usual webp band),
+including the re-cut Page 2, and git reports both as *modified*, so the casing is
+intact and nothing will 404 on Vercel.
+
+---
+
+## 2026-08-10 — Page 6 + Page 8 replaced; nothing needed retiming
 
 Author replaced two clips (swept into commit `42ec59d`). **No code changes were
 needed** — but only because I measured what changed rather than assuming.
