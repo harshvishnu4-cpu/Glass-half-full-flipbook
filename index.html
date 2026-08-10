@@ -71,8 +71,9 @@
 
 <!-- ══════════════════════════════════════════════════════════════════════════
      PROJECT-LEVEL SCENE OVERRIDE (kept out of engine/ on purpose — to go back
-     to the starlit night delete THREE things: this block, the .dust-burst
-     markup below, and the drop-sfx <script> at the bottom of <body>).
+     to the starlit night delete TWO things: this block and the .dust-burst
+     markup below). The drop's thud <script> used to be a third; it has been
+     removed, so the landing is silent.
      No tap is required to start: the book drops as soon as the page loads.
 
      THE TABLE SCENE: the closed hardcover lies on a Halloween desk
@@ -318,61 +319,11 @@
 <!-- The flip engine (reads window.STORY) — do not edit -->
 <script src="engine/script.js"></script>
 
-<!-- Part of the TABLE SCENE (see the <style> block in <head>): the thud when
-     the book lands, so the drop has weight. This replaces an earlier
-     synthesized attempt with the author's own recording.
-
-     WHICH TAKE, AND WHY: sfx/Book drop.mp3 holds NINE separate takes. The one
-     at 10.796s is the keeper — a single clean impact with a natural settle,
-     the loudest of the nine, and with two-thirds of its energy in the
-     150Hz-4kHz band that laptop and phone speakers actually reproduce. (The
-     take that scored best on mid-range alone turned out to be pages riffling
-     rather than a drop; the waveform showed it, the numbers didn't.) It is cut
-     to sfx/book-drop.wav — 0.78s, mono, faded at both ends so there is no
-     click, normalised. The full mp3 stays as the source and is never loaded;
-     re-cut with a different take by changing START in the scratchpad's
-     dropcut.js.
-
-     LEVEL: played at 0.55, so the reader hears roughly six times a page flip's
-     loudness — an impact should clearly outweigh a page rustle without being a
-     shock for a small child.
-
-     WHEN IT ACTUALLY SOUNDS — worth knowing before "fixing" this again.
-     Hosted (Vercel), on a cold first visit, it does NOT. The file is fine —
-     it serves 200 / audio/wav and loads fully; the browser refuses to play it:
-         NotAllowedError: play() failed because the user didn't
-         interact with the document first.
-     No browser plays sound before the reader has touched the page, and the
-     book drops on load, before any touch can happen. It DOES sound on any
-     later visit or reload once the reader has interacted with the site.
-
-     Holding the drop behind a "tap to begin" was tried and removed at the
-     author's request — the entrance is worth more than the sound effect. The
-     other option, dropping on the Play tap, would push the story ~0.9s further
-     behind that tap, and the opening delay has already been tuned down once.
-     So: the drop plays on load, and the thud is best-effort.
-
-     Reduced-motion readers get no drop, so no thud either. -->
-<script>
-(function () {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  var IMPACT_MS = 760;                       // the landing frame of bookDrop
-  var thud;
-  try {
-    // an <audio> element, NOT fetch() + Web Audio: fetch is blocked on file://
-    // URLs, and this book has to work when index.html is simply double-clicked
-    thud = new Audio("sfx/book-drop.wav");
-    thud.preload = "auto";
-    thud.volume = 0.55;                      // ≈6× a page flip — see the note above
-  } catch (e) { return; }
-  setTimeout(function () {
-    try {
-      var p = thud.play();
-      if (p && p.catch) p.catch(function () {});   // autoplay refused → stay silent
-    } catch (e) {}
-  }, IMPACT_MS);
-})();
-</script>
+<!-- The book-drop THUD used to play here; removed at the author's request, so the
+     drop is now silent. The recordings stay in sfx/ (book-drop.wav, cut from the
+     nine takes in Book drop.mp3) in case it is ever wanted back — it was an
+     <audio> element at volume 0.55 on a 760ms timer, matching bookDrop's landing
+     frame, and skipped entirely under prefers-reduced-motion. -->
 
 <!-- ⚠ DEV ONLY — page-jump hamburger for testing. DELETE THIS ONE LINE and the
      dev/ folder to remove it completely; it touches nothing else. -->

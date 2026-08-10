@@ -13,7 +13,39 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — an IRIS closes the story on the glass
+## 2026-08-10 (latest) — the book-drop thud is gone
+
+Author: remove the book drop sound. The whole `<script>` at the bottom of `<body>`
+is gone, so the landing is silent.
+
+**Only the sound went.** The drop itself is untouched — `bookDrop` still runs its
+1150ms, the dust burst still fires at the landing, and the load gate still opens.
+Verified by instrumenting the `Audio` constructor: after load *and* after opening,
+the elements created are `pour.wav`, the pour prompt, `glass-full.wav`,
+`BG Music.mp3`, `Page flip.mp3` and `cover page flip.mp3` — **no drop**, and
+nothing requests the file at all. The asset audit is down from 29 references to 28,
+which is the one that left.
+
+**The recordings stay in `sfx/`** — `book-drop.wav` and the nine-take
+`Book drop.mp3` it was cut from. They are now unreferenced, but this effect has
+already been added, tuned, diagnosed and restored once across this project, so
+deleting the audio would be the expensive half of the decision to reverse. Say the
+word and they go.
+
+Two stale comments fixed rather than left to mislead:
+
+- The `<head>` scene-override block said "to go back to the starlit night delete
+  **THREE** things … and the drop-sfx `<script>` at the bottom of `<body>`". That
+  script no longer exists, so it now says TWO and notes what happened to the third.
+- Where the script was, a short note records what it did (an `<audio>` element at
+  volume 0.55 on a 760ms timer matching the landing frame, skipped under
+  `prefers-reduced-motion`) so restoring it does not need re-deriving.
+
+Read-through clean, `errors: (none)`.
+
+---
+
+## 2026-08-10 — an IRIS closes the story on the glass
 
 Author: make the ending better — as the clip zooms into the glass, go to black with
 a circle focusing on it. New page-level option:
