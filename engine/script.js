@@ -659,6 +659,32 @@ pages.forEach(function (page, i) {
       }
       const isVideo = /\.(mp4|webm)$/i.test(sc.src);
       layer.appendChild(makeMedia({ type: isVideo ? "video" : "image", src: sc.src, alt: sc.alt }));
+      // `layers` — extra art placed ON TOP of this scene's base image, each at
+      // `at: {x, y, w}` in % of the page (same units as the pour scene). Lets a
+      // still scene be COMPOSED from separate assets — a background plus the
+      // thing the story is about — instead of one baked frame, so the subject
+      // stays a crisp png and can be nudged without a re-export.
+      (sc.layers || []).forEach(function (ly) {
+        const el = document.createElement("img");
+        el.className = "scene-layer";
+        el.alt = ly.alt || "";
+        el.draggable = false;
+        el.decoding = "async";
+        el.src = encodeURI(ly.src);
+        const a = ly.at || {};
+        el.style.left = a.x || "50%";
+        el.style.top = a.y || "0%";
+        el.style.width = a.w || "30%";
+        layer.appendChild(el);
+      });
+      // `sound` — this scene's own narration, for a scene with no video to carry
+      // it. Built here (not when the scene lands) so it preloads. An <audio>
+      // element, not fetch + Web Audio, because fetch is blocked on file:// and
+      // this book must work when index.html is double-clicked.
+      if (sc.sound) {
+        layer._sceneSound = new Audio(encodeURI(sc.sound));
+        layer._sceneSound.preload = "auto";
+      }
       if (sc.fx) {
         const fxEl = makeFx(sc.fx, layer);     // ambient animation for this scene
         if (fxEl) layer.appendChild(fxEl);
@@ -1119,6 +1145,11 @@ function renderLeaves() {
    each flip completes and once the cover has finished opening. */
 let mediaDelayTimer = null;   // pending "start this video after N ms" timer
 let mediaDelayIdx = -1;       // which page that pending timer belongs to
+// Safety net for the mid-turn hold below: the settle call normally starts the
+// clip, so this only fires if a turn's completion callback never arrives (a
+// killed peel tween, a tab backgrounded mid-flip) — a page must never be left
+// sitting on a frozen first frame. Slightly past the flip so it loses the race.
+const TURN_HOLD_MS = FLIP_MS + 60;
 let lastMediaIdx = -1;        // last page refreshMedia handled (to arm the blink once)
 let armBlink = false;         // allow the video-end arrow blink ONCE per page arrival
 
@@ -1336,6 +1367,9 @@ function resetScenes(leaf) {                   // back to scene 0, bubbles + vid
     const b = l.querySelector(".bubble");
     if (b) resetBubble(b);
     l.querySelectorAll(".scene-tap").forEach(function (t) { t.remove(); });   // stray hot-spot
+    if (l._sceneSound) {                       // a separate narration replays from the top
+      try { l._sceneSound.onended = null; l._sceneSound.pause(); l._sceneSound.currentTime = 0; } catch (_) {}
+    }
     const v = l.querySelector("video.page-media");
     if (v) {
       if (v._sceneAdv) {
@@ -1424,6 +1458,19 @@ function playScenes(idx, startDelay) {
     const vid = layer.querySelector("video.page-media");
     let typedMs = 0;
     if (vid) sceneWait(function () { playVideoNow(vid, true); }, revealDelay);   // a scene landing always starts its clip
+    // A scene whose narration is a separate file rather than baked into a clip:
+    // same moment, same music duck. play() is catch-wrapped like every other
+    // sound here — a blocked line must leave the scene playable, not stuck.
+    if (layer._sceneSound) sceneWait(function () {
+      const a = layer._sceneSound;
+      duckMusic(true);
+      a.onended = function () { duckMusic(false); };
+      try {
+        a.currentTime = 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(function () { duckMusic(false); });
+      } catch (_) { duckMusic(false); }
+    }, revealDelay);
     if (bub) {
       const t = bub.querySelector(".bubble-text");
       const full = (t && t.dataset.full) || "";
@@ -1438,6 +1485,12 @@ function playScenes(idx, startDelay) {
         // invisibly under the 1.1s dissolve, and could even run on into a bad
         // final frame. Scenes that advance on `ended` are already stopped.
         if (vid) { try { vid.pause(); } catch (_) {} }
+        // …and the same for a separate narration file, or it would keep talking
+        // invisibly under the 1.1s dissolve
+        if (layer._sceneSound) {
+          try { layer._sceneSound.onended = null; layer._sceneSound.pause(); } catch (_) {}
+          duckMusic(false);
+        }
         layer.classList.remove("on");          // cross-dissolve: old fades out…
         layers[si + 1].classList.add("on");    // …new fades in (1.1s, CSS)
         showScene(si + 1, DISSOLVE_MS);        // next bubble pops as it lands
@@ -1575,7 +1628,17 @@ function refreshMedia() {
   // always happens long after the gate opens, so flips are unaffected.
   const v = mediaGate ? pv : null;
   if (v) {
-    const delayMs = (pages[idx] && pages[idx].delay) ? pages[idx].delay : 0;
+    // …and NOT while the page is still TURNING. Every turn path calls
+    // refreshMedia() twice — once as the flip starts and once when it settles —
+    // and starting playback on the first call ran the clip for the whole 1150ms
+    // flip: the narration played over the turn and the reader landed already a
+    // second into the page. Scenes and bubbles have always waited
+    // (animating ? 700 : 150); a video page now waits too, holding on the first
+    // frame warmVideo() already decoded. The settle call — where `animating` is
+    // false, set by every turn path before it calls refreshMedia — is what
+    // starts it, so the clip begins as the page lands.
+    const explicitDelay = (pages[idx] && pages[idx].delay) ? pages[idx].delay : 0;
+    const delayMs = explicitDelay || (animating ? TURN_HOLD_MS : 0);
     if (delayMs > 0) {
       // Already playing this page, or already counting down for it → leave it alone
       // (so the flip-start + flip-end calls don't restart the 3s countdown).
@@ -1589,6 +1652,12 @@ function refreshMedia() {
         }, delayMs);
       }
     } else {
+      // Landed (or no turn at all). Drop a pending HOLD first: left alive, its
+      // timer would fire a moment later with restart=true and yank the clip back
+      // to the top just after it started.
+      if (mediaDelayTimer && mediaDelayIdx === idx) {
+        clearTimeout(mediaDelayTimer); mediaDelayTimer = null; mediaDelayIdx = -1;
+      }
       playVideoNow(v, arrived);                 // no delay → instant
     }
   }
@@ -1612,7 +1681,12 @@ function refreshMedia() {
   // (Scenes only run while the book is OPEN — never behind a closing cover.)
   if (cur && pages[idx] && pages[idx].scenes) {
     if (opened) {
-      playScenes(idx, animating ? 700 : 150);
+      // Same rule as the single-video page above: the first scene reveals once the
+      // turn has LANDED, not 450ms before it (the old 700ms against a 1150ms
+      // flip). This one delay is the scene's whole time origin — `tap.after` and
+      // scene `hold`s are measured from it — so moving it keeps every downstream
+      // cue in step with the clip instead of drifting against it.
+      playScenes(idx, animating ? TURN_HOLD_MS : 150);
       // Returned to a page whose sequence already played out before its
       // reset kicked in (quick back-and-forth): it's still "done".
       if (scenePlayPage === idx && sceneSeqDone === idx) dialogueDone(idx);

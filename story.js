@@ -97,31 +97,53 @@ window.STORY = {
     { type: "video", src: "assets/pages/Page 4.mp4"  },   // 16s
 
     // ── PAGE 5 — TAP THE POUR BUTTON ───────────────────────────────────────
-    // Three clips on ONE page, cross-dissolving: the dragon mixes the juice, the
-    // machine waits, and the reader has to TAP it to make it pour.
-    //   `tap:` on the middle scene = the page STOPS there. A pulsing ring + hand
-    //   appears over the POUR button and the story only continues when the reader
-    //   taps (anywhere on the page counts, so a small child doesn't have to aim).
-    //   Move the ring with `at` (% of the page) and `size` (ring px).
-    //   `after: 4800` = show the ring 4.8s in, as soon as the clip's narration
-    //   ends — the clip itself runs 7.6s, and waiting for all of it left the
-    //   reader staring at a silent, still frame. Lower it to prompt sooner.
+    // Three scenes on ONE page, cross-dissolving: the dragon mixes the juice (a
+    // clip), the machine waits (COMPOSED from stills — see below), and the reader
+    // has to TAP to make it pour (a clip).
+    //   `tap:` on the middle scene = the page STOPS there. A tapping hand appears
+    //   and the story only continues when the reader taps (anywhere on the page
+    //   counts, so a small child doesn't have to aim).
+    //   `after` = how far into the scene the cue appears: as soon as the
+    //   narration ends, not when the scene's media runs out — waiting for all of
+    //   it left the reader staring at a silent, still frame.
     { scenes: [
         // hold: 3600 — the clip is 4.6s but its narration ends at 2.5s, and its
         // LAST FRAMES ARE BLANK WHITE (an export glitch), so move on before then.
         { src: "assets/pages/Page 5.mp4", hold: 3600 },         // mixing the juice
-        { src: "assets/pages/Page 5 part 2.mp4",                // waiting to be tapped
+        // ── FROM FIGMA: "Slide 16:9 - 693", node 756:4 ────────────────────────
+        // This scene was Page 5 part 2.mp4 — 8.5s of video whose picture never
+        // changed (every sampled frame identical), just narration over a still.
+        // It is now built from the design's own two layers, so the machine stays
+        // a crisp png and can be moved without a re-export.
+        //   src    : the design's full-bleed background (node 756:6, 1920x1080
+        //            at 0,0). Byte-identical to the Figma export — and to
+        //            assets/pages/pour/bg.webp, which is the same picture at
+        //            25KB instead of 1007KB if you'd rather not ship both.
+        //   layers : the machine (node 756:7) at the design's own box —
+        //            left 632px, top 19px, 657x987 of a 1920x1080 frame, which
+        //            is 32.92% / 1.76% / 34.22% of the page. Height is left to
+        //            the art (657x987 is machine.png's 342x514 scaled 1.921x, so
+        //            the width alone reproduces the design).
+        //            (The design has a second copy of this image parked
+        //            off-canvas at left -382px — not visible, not rendered.)
+        //   sound  : the narration that used to be baked into the clip, lifted
+        //            out of it unchanged — speech still starts 0.86s in, which
+        //            is what `after` below is fitted to.
+        { src: "assets/pages/background.png",
+          layers: [ { src: "assets/pages/machine.png",
+                      at: { x: "32.92%", y: "1.76%", w: "34.22%" } } ],
+          sound: "assets/audios/page 5 part 2.wav",
           // anywhere: the cue is a tapping hand on open space — NOT a ring on
-          // the machine's POUR button, which is part 4's job. A tap anywhere on
+          // the machine's POUR button, which is page 6's job. A tap anywhere on
           // the screen continues (it always did; the hint now says so).
-          // after: the clip is 8.5s but its narration runs 0.8s→5.0s, so the cue
-          // comes up at 5.1s — the moment the line lands, not 3.4s later when
-          // the clip finally ends (and not at 4.8s, over the last word).
-          // at: ON THE MACHINE (its centre in this clip is x 45.2%), not off in
-          // the empty table space it used to sit in — a tap anywhere still
-          // counts (`anywhere` drops the targeting ring), but the hand now
-          // draws the eye to the thing the story is about.
-          tap: { after: 5100, anywhere: true, at: { x: "45.2%", y: "58%" },
+          // after: the narration runs 0.86s→5.0s, so the cue comes up at 5.1s —
+          // the moment the line lands (and not at 4.8s, over the last word).
+          // at: ON THE MACHINE. The design centres it, so its body's centre is
+          // x 49.5% — it was 45.2% in the old clip, and a cue left at 45.2%
+          // would now point at bare table. A tap anywhere still counts
+          // (`anywhere` drops the targeting ring), but the hand has to draw the
+          // eye to the thing the story is about.
+          tap: { after: 5100, anywhere: true, at: { x: "49.5%", y: "58%" },
                  label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
     ] },

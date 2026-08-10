@@ -13,7 +13,152 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the POUR button waits for its spoken instruction
+## 2026-08-10 (latest) — page 5 scene 2 implemented from Figma (node 756:4)
+
+Author: implement Figma "The Glass Half Full LBDs" node **756:4** ("Slide 16:9 -
+693") as page 5 part 2. The design is two layers on a 1920×1080 frame:
+
+| node | what | box |
+|---|---|---|
+| 756:6 | background | 0,0 · 1920×1080 (full-bleed) |
+| 756:7 | machine | left 632, top 19 · 657×987 |
+| 756:5 | machine again | left **−382** — off-canvas, not visible, **not rendered** |
+
+That replaces `Page 5 part 2.mp4` — a good clip to lose: sampled at 9 points
+across its 8.47s, **the machine's box was pixel-identical every time** (25736–25739
+purple pixels, same x/y/w/h). It was 876KB of video carrying a still and a voice.
+
+### The assets were already in the repo
+
+`download_assets` returned the node's raw images, and **SHA1 says they are byte
+for byte the files the author had already added**: `background.png` =
+`20cf67b4016b4f62`, `machine.png` = `1817660284d739d1`. So the scene points at the
+project's own copies rather than a second set — that is the project's data source,
+not a substitution.
+
+### Translating the design into the engine's units
+
+The reference code is React + Tailwind with absolute px; this engine has neither.
+Everything becomes % of the page, which `fitScale` then scales:
+
+- left 632/1920 = **32.92%**, top 19/1080 = **1.76%**, width 657/1920 = **34.22%**
+- Height is left to the art. 657×987 is `machine.png`'s 342×514 scaled **1.9211×**
+  in width and 1.9203× in height — uniform within rounding — so the width alone
+  reproduces the design and the png keeps its own aspect.
+
+Measured back off the live page at the design's own 1920×1080: **left 632.1,
+top 19.0, 657×987.5** against the node's 632/19/657×987, and the machine's purple
+body lands on the export's to **0.00%** in x, y, w and h. Whole frame vs the design
+export: **0.36% mean**.
+
+### The cue had to move, and the narration had to be rescued
+
+- **`tap.at.x` 45.2% → 49.5%.** The design CENTRES the machine: its body's centre
+  is x 49.45%, where the old clip had it at 45.23%. A cue left at 45.2% would have
+  pointed at bare table. Everything else about the cue is unchanged.
+- **The spoken line was baked into the video.** Deleting the clip without lifting
+  it out would have left a scene that looked right and said nothing. Decoded the
+  mp4's audio track to `assets/audios/page 5 part 2.wav` (48kHz mono, 5.40s,
+  506KB), keeping the original time origin — speech still starts at 0.86s and ends
+  at 5.0s — and cutting only 3.07s of trailing silence, because `tap.after: 5100`
+  is fitted to that timeline. Live, the cue now appears with the narration at
+  **5.05s**, right after the last word.
+
+### Two engine options this needed (both general, not page-5 specific)
+
+- **`layers: [{ src, at: {x, y, w} }]`** — art placed over a scene's base image in
+  % of the page, exactly like the pour scene's machine. `height: auto`, so `w` is
+  the single knob. A still scene can be assembled from parts instead of baked flat.
+- **`sound`** — a scene's own narration, for a scene with no clip to carry it.
+  Built at leaf-build time so it PRELOADS; an `<audio>` element rather than fetch +
+  Web Audio (fetch is blocked on `file://`, and this book must work when index.html
+  is double-clicked). Ducks the music, `catch`-wrapped so a blocked line can't
+  strand the scene, paused when the scene dissolves out (or it keeps talking under
+  the 1.1s dissolve), rewound in `resetScenes`.
+
+Verified live: no page errors, nothing 404s, the machine layer renders 434×652 and
+decodes, the line starts at **1101ms** — as the cross-dissolve completes, the same
+moment the clip used to start — the cue lands at 6199ms, tapping advances to scene
+3 and stops the audio, a reset rewinds it. Read-through clean.
+
+### Note for the author
+
+`background.png` is the same picture as `assets/pages/pour/bg.webp` (0.3% apart —
+webp noise) at **1007KB against 25KB**. `src` points at the design's own PNG as
+asked; switching that one line makes this change a net **184KB smaller** than the
+video it replaced instead of 798KB larger. `machine.png` at 342×514 is upscaled
+1.92× by the design itself, so it is soft at 1080p — the design asks for 657×987
+and a matching export would sharpen it.
+
+---
+
+## 2026-08-10 — a page's clip no longer plays during the page turn
+
+Author: "page 4 video play before the page turn." It did — and so did every other
+page. This was never a Page 4 problem.
+
+`turnLeaf` and both drag-release paths call `refreshMedia()` **twice**: once as the
+flip begins (its comment read *"START now → the target video plays INSTANTLY"*) and
+once when it settles. Playback started on the first call, so the clip ran for the
+whole `FLIP_MS` 1150ms flip — narration over the turn, and the reader landing
+already a second into the page.
+
+`refreshMedia` now treats a turn in progress like the `delay` option it already
+supported: while `animating` is true the clip is **paused and held on frame 0**
+(already decoded by `warmVideo`), and the settle call — where every turn path has
+set `animating = false` before calling — is what starts it. So the clip begins as
+the page lands.
+
+Two things that had to come with it:
+
+- **Clear the pending hold before playing.** Left alive, its timer fires ~1.2s in
+  with `restart=true` and yanks the clip back to the top just after it started.
+- **`TURN_HOLD_MS` (`FLIP_MS + 60`) is a safety net, not the mechanism.** It only
+  matters if a completion callback never arrives — a killed peel tween, a tab
+  backgrounded mid-flip — so a page is never left on a frozen first frame. The
+  stall watchdog already tolerates it: `armTurnCue` treats
+  `mediaDelayTimer && mediaDelayIdx === idx` as "counting, not stuck", and the
+  hold reuses exactly those two variables.
+
+**The scenes path had the same bug**, 450ms of it: `playScenes(idx, animating ? 700
+: 150)` revealed scene 1 at 700ms of a 1150ms flip. Raising that to `TURN_HOLD_MS`
+was the right fix rather than delaying only the clip, because that one delay is the
+scene's whole **time origin** — `tap.after` and scene `hold`s are measured from it,
+so moving the clip alone would have slid the page-5 tap cue out of sync with the
+narration it was fitted to. Shifting the origin keeps them locked together;
+verified the cue still appears at **clip time 5.0s** against its authored 5.1s,
+unchanged from when it was fitted on 08-07. No live scenes page has a bubble and no
+page uses `delay`, so nothing else moved — both checked against STORY, not assumed.
+
+Verified: page 3→4 and 4→5 both hold `currentTime` at **0 across 44 frames** of the
+flip, paused throughout, then start at 1284ms / 1380ms against the 1150ms flip and
+run on monotonically — no restart. Backward turns hold too (started 1257ms). Page 1
+is untouched at 1969ms after the Play tap, since the cover opening sets no
+`animating` flag and its media gate still governs. Read-through clean.
+
+**My diagnosis was wrong and measuring killed it.** I assumed the re-recorded Page
+4 now began speaking immediately where the old one had a lead-in. The opposite:
+speech starts at **0.4s** in the new export and **0.08s** in the previous one — the
+re-record made it *better*. The onset table shows why the author noticed it on Page
+4 and why it was never Page 4's fault:
+
+| clip | audio starts | heard during a 1.15s turn |
+|---|---|---|
+| Page 1 | 0.00s | 1.15s |
+| Page 5 part 3 | 0.02s | 1.13s |
+| Page 3 | 0.28s | 0.87s |
+| Page 4 | 0.40s | 0.75s |
+| Page 2 / 6 / 9 | 0.50s | 0.65s |
+| Page 8 | 0.64s | 0.51s |
+| Page 5 / 5p2 / 10 | 0.82–0.88s | ~0.3s |
+| Page 7 | 1.20s | none |
+
+Every page but Page 7 bled into its turn. Had I "fixed Page 4" on the strength of
+that hypothesis I would have shipped a per-clip workaround for an engine bug.
+
+---
+
+## 2026-08-10 — the POUR button waits for its spoken instruction
 
 Author added `assets/audios/Tap the button to pour juice1.mp3` and asked that the
 button only become tappable once the line has finished.
