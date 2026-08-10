@@ -13,7 +13,62 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the new Play button (and the engine stopped squashing it)
+## 2026-08-10 (latest) — a "press me" effect on the Play button
+
+Author: "add some special effect on play button." Three parts, all pure CSS, no
+markup and no JS:
+
+| part | what it does |
+|---|---|
+| `.play-btn::before` | a gold halo ripple pushing outward — "tap here" |
+| `.play-btn::after` | five sparks that twinkle on the beat while slowly orbiting (14s) |
+| `.play-art` | a candle-warm glow swelling with the breath |
+
+**All of it runs on the existing `playBreathe` 2.6s beat**, not on periods of its
+own. That is the lesson the page-turn cue taught earlier today: three effects on
+three periods read as three things happening at once, while one shared period
+reads as a single living object. Verified in the browser — every beat-driven part
+reports `2600ms` and all four sit within **0ms** of each other in their cycles.
+(The orbit is deliberately off-beat at 14s: a slow drift, not a pulse.)
+
+Details that mattered:
+
+- **The pseudo-elements MUST be `position: absolute`.** `.play-btn` is
+  `display: grid`, and a static pseudo-element becomes a grid ITEM — it would have
+  shoved the artwork out of the centre. Checked: the art still measures the full
+  170×170 inside a 170×170 button.
+- **`pointer-events: none` on both**, and the tap target is untouched at 170×170 —
+  the effect can never eat the tap that opens the book.
+- **Every keyframe repeats `translate(-50%, -50%)`.** The pseudo-elements are
+  centred by their own transform, so a keyframe that sets only `scale()` or
+  `rotate()` drops the centring and the ring flies to the corner. The same trap
+  the existing `playBreathe` comment warns about.
+- **The glow lives in the keyframes with the cast shadow.** Animating `filter`
+  replaces the whole property, so the original
+  `drop-shadow(0 9px 14px rgba(6,4,26,.55))` is repeated in both stops or the
+  button loses the shadow that lifts it off the cover.
+- **Pressed state:** `:active` already stops the breath; the halo stops too — once
+  the invitation is accepted it should not keep inviting.
+
+**Reduced motion keeps it special without moving.** Everything stops, but the
+button holds a steady warm glow, a static halo at 0.45 opacity and the sparks at
+0.8 — a reader who asks for less motion should still see the one control on the
+cover, not a plain image. That override block sits AFTER the rules it overrides,
+for the ordering reason logged in the entry below.
+
+First pass had the sparks at 2.4–3.4px, which at book scale rendered as ~3px dots
+and barely read. Bumped ~35% and added a 4px bloom so each spark reads as *light*
+rather than a dot, with the twinkle floor raised 0.35 → 0.45.
+
+Verified: five animations running and in phase, no page errors, reduced motion
+silences all of them, and — worth checking because the sparkle layer extends to
+132% of the button, wider than the art — **the whole effect disappears with the
+button when the cover opens**: a pixel crop of exactly where the halo and sparks
+lived shows only page 1's artwork afterwards. Read-through clean, `errors: (none)`.
+
+---
+
+## 2026-08-10 — the new Play button (and the engine stopped squashing it)
 
 `assets/play button.svg` — an orange cobweb disc with a white play triangle and
 gold sparkles — replaces `assets/wish button.svg` on the cover. Both references
