@@ -13,7 +13,43 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the step jutting out of the book's bottom-right corner
+## 2026-08-10 (latest) — the nav arrows were sitting ON the book
+
+Author: the back/forward arrows overlap the book. They did — **on 8 of the 10
+test viewports**, the gold glyph intruded 8–20px onto the book's frame.
+
+The arrows are meant to sit just under the book's bottom corners. The button is
+a deliberately generous tap target whose outer ~21% is empty padding; only the
+middle 58% is the visible glyph. `fitScale` sized the button so that *the glyph*
+fits the strip under the book — but then clamped with `vh - btn - 4`, which
+keeps the **whole box** on screen. On a normal screen that clamp pushed the
+button up by roughly its own padding, dragging the visible arrow back onto the
+book — the exact thing the placement was avoiding. Its comment called it a
+"very short screens" fallback; it was firing almost always.
+
+Fixed by expressing both the placement and the clamp in terms of the glyph:
+`maxY = vh - 4 - (btn + glyph)/2`. That alone cleared 8 of 10.
+
+The two shortest landscape phones had no room at all — the strip under the book
+is thinner than the smallest allowed button. Rather than shrink the button (a
+56px minimum is what makes it hittable for a small child), the **glyph** is now
+capped to what the strip can hold and the box stays ≥56px:
+`--arrow-glyph` drives the SVG's size, so the artwork shrinks inside an
+unchanged tap target. Trading a cosmetic overlap for an unhittable control would
+have been the wrong way round.
+
+Now clear on all 10 viewports with a 3–6px gap under the frame, tap target still
+56px+ everywhere, glyph never off-screen, and a real click still turns the page.
+
+*Measurement note:* my first pass measured the BUTTON BOX against the book and
+reported an overlap everywhere including the two that were actually fine — the
+box is supposed to overlap. Measure the thing the reader can see (the `<svg>`),
+against the book's visible `.book-frame` rather than the 1280×720 book box,
+which is smaller than the frame drawn around it.
+
+---
+
+## 2026-08-10 — the step jutting out of the book's bottom-right corner
 
 Author spotted a bright tab poking out of the closed book's bottom-right. Cause:
 **`.pb-back-lip` had `right: -10px`**, so the back-cover lip painted ~6px PAST

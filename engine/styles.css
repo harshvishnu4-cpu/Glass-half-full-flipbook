@@ -202,7 +202,9 @@
   .corner-arrow[disabled] { opacity: 0.22; pointer-events: none; }
   .corner-arrow.back { left: var(--back-x, 12px); top: var(--arrow-y, 80vh); }
   .corner-arrow.fwd  { left: var(--fwd-x, 90vw);  top: var(--arrow-y, 80vh); }
-  .corner-arrow svg  { width: 58%; height: 58%; }
+  /* the gold glyph fills the middle of the button; fitScale shrinks it (never
+     the button) when the strip under the book is too thin to clear the page */
+  .corner-arrow svg  { width: var(--arrow-glyph, 58%); height: var(--arrow-glyph, 58%); }
   .corner-arrow.back svg { transform: scaleX(-1); }   /* mirror the forward arrow */
 
   /* ---- Page-turn hint (hand on the RIGHT side of the book) -------------------

@@ -1031,10 +1031,26 @@ function fitScale() {
   const btn = Math.max(56, Math.min(124, Math.round(120 * s), Math.floor(Math.max(room, 0) / 0.58) || 56));
   const rs = document.documentElement.style;
   rs.setProperty("--arrow-size", btn + "px");
-  // Never let the button box sink below the fold: when the strip under the book
-  // is thinner than the button (very short screens), the arrow rides up ONTO the
-  // page's bottom corner instead — still visible, still tappable.
-  const arrowY = Math.min(Math.round(cornerY + 2 - 0.21 * btn), vh - btn - 4);
+  // GLYPH, not box. The button is a generous tap target and its outer ~21% on
+  // each side is empty padding; only the middle 58% is the gold arrow. Both the
+  // "sits below the book" placement and the "stays on screen" clamp therefore
+  // have to be expressed in terms of the GLYPH.
+  //   Clamping the BOX to the viewport (the old `vh - btn - 4`) was wrong: on a
+  //   typical screen it pushed the button up by roughly its own padding, which
+  //   dragged the visible arrow back onto the book's bottom corners — the whole
+  //   thing it was supposed to avoid. It fired on 8 of 10 test viewports, so the
+  //   "very short screen" fallback was in fact the normal case.
+  // On a short landscape phone the strip under the book is thinner than even the
+  // smallest button, so the glyph is capped to what the strip can hold WITHOUT
+  // shrinking the button: the box stays ≥56px as a tap target a child can hit,
+  // and only the artwork inside it gets smaller. Shrinking the button instead
+  // would have traded a cosmetic overlap for an unhittable control.
+  const glyph = Math.max(14, Math.min(0.58 * btn, room - 6));
+  rs.setProperty("--arrow-glyph", (glyph / btn * 100).toFixed(2) + "%");
+  const pad = (btn - glyph) / 2;                             // padding above the glyph
+  const wantY = cornerY + 2 - pad;                           // glyph 2px under the book
+  const maxY = vh - 4 - (btn + glyph) / 2;                   // glyph's BOTTOM stays on screen
+  const arrowY = Math.round(Math.min(wantY, maxY));
   rs.setProperty("--arrow-y", arrowY + "px");
   // …and keep both inside the sides on very narrow screens.
   rs.setProperty("--back-x", Math.max(2, Math.round(cornerL - btn / 2)) + "px");
