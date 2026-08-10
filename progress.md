@@ -13,7 +13,44 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the POUR hand moved down and grew
+## 2026-08-10 (latest) — new Page 2 export: audio only, nothing to change
+
+Author replaced `Page 2.mp4`. It came in already committed, swept into `d3aafd8`
+alongside the pour-hand change, at the **same byte size** (5500730 → 5500730) but a
+different hash (`50dc61fe…` → `54698f20…`) — so size alone would have missed it
+entirely. Compared against `d3aafd8^`:
+
+- **Picture identical** at all 17 sampled frames; 1920×1080 both.
+- **Duration identical**: 17.441s. `story.js`'s `// 17s` still right.
+- **Audio re-recorded over the first two lines.** Window-by-window PCM shows the
+  change confined to **0.5s → 9s**; from 9.5s to the end it is bit-identical
+  (diff rms exactly 0). Same 48kHz stereo, speech still 0.5s → ~17.05s, and the
+  overall level unchanged (mean rms change −0.0003, peak 0.2445 vs 0.2683).
+  Within the changed stretch a line has clearly MOVED, not just been re-read:
+  at 5.0s the new take has sound where the old was silent, and at 6.0s it is
+  near-silent where the old was speaking.
+- **Poster still matches frame 0** (0.8%, inside the usual 0.56–1.2% webp band).
+- Filename casing intact — git reports it as *modified*, not delete + add.
+
+Nothing needed retiming: Page 2 is a plain `{ type: "video" }` page whose turn cue
+arms on `ended`. Read-through clean, `errors: (none)`.
+
+### The static checker had two blind spots — both now fixed
+
+Worth recording because the first one already let a real bug through once:
+
+- It matched only `url()`, `src=` and `href=`, so **`new Audio("…")` was invisible**
+  — exactly how the missing `sfx/book-drop.wav` slipped past it while every load
+  logged `ERR_FILE_NOT_FOUND`. Widened; the count went 26 → 29 references.
+- With that widened, it immediately reported `sfx/Page%20flip.mp3` and
+  `sfx/cover%20page%20flip.mp3` as MISSING. They are not: those references are
+  **percent-encoded in the source** and the filesystem has the decoded names. The
+  check now decodes before testing existence and before the per-segment case
+  comparison. A checker that cries wolf is worse than no checker.
+
+---
+
+## 2026-08-10 — the POUR hand moved down and grew
 
 Author, with a screenshot: the hand covers the button, so "POUR" reads as "P**R".
 It did. Measured against the page:
