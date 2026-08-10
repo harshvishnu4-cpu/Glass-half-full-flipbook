@@ -1315,6 +1315,33 @@
     50%      { opacity: 1;    transform: translate(-50%, -50%) scale(1.18); }
   }
   /* slight over-scale so the jitter never reveals the page edge */
+  /* IRIS-IN (see makeIris in script.js) — the page goes black except a circle
+     that closes onto the subject and holds it spotlit.
+     The black is a huge box-shadow SPREAD on the circle, so a single transform
+     animates the whole iris on the compositor. The spread is in book px (the
+     book is 1280x720, so 2000px covers any corner) rather than vmax, because
+     this layer is inside the scaled book and viewport units would not track it. */
+  .page-iris {
+    position: absolute; inset: 0; overflow: hidden;
+    border-radius: inherit; pointer-events: none;
+    z-index: 4;                      /* over the art + fx, under the curl/bubble */
+  }
+  .page-iris i {
+    position: absolute; left: var(--ix, 50%); top: var(--iy, 50%);
+    width: var(--isize, 38%); aspect-ratio: 1; border-radius: 50%;
+    /* starts wide enough to hide nothing, then closes to --isize */
+    transform: translate(-50%, -50%) scale(3.4);
+    opacity: 0;
+    box-shadow: 0 0 0 2000px rgba(3, 1, 10, 0.94),      /* everything outside */
+                inset 0 0 46px 14px rgba(3, 1, 10, 0.5); /* feathered rim */
+    transition: transform 1500ms cubic-bezier(0.38, 0, 0.2, 1),
+                opacity 700ms ease;
+  }
+  .page-iris.closing i { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    /* keep the framing — it is the point — but arrive without the travel */
+    .page-iris i { transition: none; }
+  }
   .page-scene.fx-shake .page-media { animation: fxShake 340ms linear infinite; }
   @keyframes fxShake {
     0%, 100% { transform: scale(1.02) translate(0, 0); }

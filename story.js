@@ -184,7 +184,16 @@ window.STORY = {
     { type: "video", src: "assets/pages/Page 7.mp4"  },   // 8s
     { type: "video", src: "assets/pages/Page 8.mp4"  },   // 16s
     { type: "video", src: "assets/pages/Page 9.mp4"  },   // 31s
-    { type: "video", src: "assets/pages/Page 10.mp4" },   // 15s
+    // The last story page: the clip zooms into the full glass, then an IRIS
+    // closes the page to black around it and holds it spotlit — the closing beat
+    // before THE END. `at` is measured from the clip's own clock: the zoom has
+    // arrived by ~12.6s of its 15.02s, so the circle finishes closing with the
+    // last frame. x/y are the glass's centre in the closing frames (measured:
+    // the juice's centroid settles at 49.2% / 49.3%); size is the settled
+    // circle's diameter as a % of the page width, comfortably around the glass
+    // (which is ~23% wide and ~56% tall).
+    { type: "video", src: "assets/pages/Page 10.mp4",     // 15s
+      iris: { at: 12600, x: "49%", y: "49%", size: "40%" } },
 
     { type: "end" },   // ← keep this last: the closing "The End" page
   ]

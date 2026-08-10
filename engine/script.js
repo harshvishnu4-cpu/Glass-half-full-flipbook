@@ -297,6 +297,29 @@ function makeFx(fx, layer) {
   return el;
 }
 
+/* IRIS  —  a cartoon iris-in: the page darkens to black except a circle that
+   closes onto one spot, holding it spotlit. Built for the last story page, where
+   the clip zooms into the glass and the circle keeps the eye there before the
+   reader turns to THE END.
+   Config (story.js, on a PAGE): iris: { at, x, y, size }
+     at   — ms into the page's clip to start closing. Omitted → 2.4s before the
+            clip ends, so it lands with the last frame.
+     x/y  — the centre, in % of the page (aim it at the subject).
+     size — the settled circle's DIAMETER as a % of the page width.
+   The black is a huge box-shadow spread on the circle itself, so one transform
+   animates the whole iris on the compositor — no mask, no @property, and the
+   circle stays a true circle at any book scale. */
+function makeIris(cfg) {
+  const el = document.createElement("div");
+  el.className = "page-iris";
+  el.setAttribute("aria-hidden", "true");
+  el.style.setProperty("--ix", (cfg && cfg.x) || "50%");
+  el.style.setProperty("--iy", (cfg && cfg.y) || "50%");
+  el.style.setProperty("--isize", (cfg && cfg.size) || "38%");
+  el.appendChild(document.createElement("i"));
+  return el;
+}
+
 /* ==========================================================================
    POUR SCENE  —  an interactive scene: the reader taps the POUR button and
    juice pours into a glass, one shot per tap, until it is full — then the
@@ -668,6 +691,23 @@ pages.forEach(function (page, i) {
     });
   } else {
     front.appendChild(makeMedia(page));                       // full-bleed image / video
+    if (page.iris) {
+      const irisEl = makeIris(page.iris);
+      front.appendChild(irisEl);                              // over the art, under the curl
+      const vid = front.querySelector("video.page-media");
+      if (vid) {
+        // Driven off the clip's OWN clock, not a timer from page arrival: since
+        // the turn-hold change, playback starts when the page lands, and a timer
+        // would drift from the picture. Toggling (rather than adding) also makes
+        // it self-resetting — a revisit replays the clip from 0, which is below
+        // `at`, so the iris re-opens with no teardown code.
+        vid.addEventListener("timeupdate", function () {
+          const at = (page.iris.at != null) ? page.iris.at / 1000
+                   : Math.max(0, (vid.duration || 0) - 2.4);
+          irisEl.classList.toggle("closing", vid.currentTime >= at);
+        });
+      }
+    }
     if (page.bubble) front.appendChild(makeBubble(page.bubble));  // PNG speech bubble (revealed on land)
   }
   const curl = document.createElement("div");               // moving page-curl shading

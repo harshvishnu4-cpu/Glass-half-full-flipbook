@@ -13,7 +13,52 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — new Page 2 export: audio only, nothing to change
+## 2026-08-10 (latest) — an IRIS closes the story on the glass
+
+Author: make the ending better — as the clip zooms into the glass, go to black with
+a circle focusing on it. New page-level option:
+
+    iris: { at: 12600, x: "49%", y: "49%", size: "40%" }
+
+on page 10, the last story page. The page darkens to black except a circle that
+closes onto the glass and **holds it spotlit** until the reader turns to THE END.
+
+### How it is built
+
+The black is a **2000px box-shadow spread on the circle itself**, so one
+`transform: scale()` animates the entire iris on the compositor — no mask, no
+`@property`, and the hole stays a true circle at any book scale. The spread is in
+book px rather than `vmax` because this layer lives inside the scaled book, where
+viewport units would not track it (1280×720 means 2000px covers every corner).
+`aspect-ratio: 1` keeps it circular while the width is a % of the page.
+
+**Aimed by measurement, not by eye.** Tracking the juice's pink centroid through
+the closing frames of `Page 10.mp4`: it settles at **49.24% / 49.25%**, with the
+glass about 23% wide and 56% tall — hence `x/y 49%` and a 40%-of-width diameter,
+which frames the glass with a margin. (The pink *bounding box* was useless here —
+stray juice specks spread it across most of the frame; the centroid was the stable
+signal.)
+
+**Timed off the clip's own clock**, via `timeupdate`, not a timer from page
+arrival — since the turn-hold change playback begins when the page lands, so a
+timer would drift from the picture. `at` defaults to 2.4s before the clip ends when
+omitted. Using `classList.toggle(…, currentTime >= at)` rather than `add` makes it
+**self-resetting**: a revisit replays the clip from 0, which is below `at`, so the
+iris re-opens with no teardown code at all. Verified — after going back and
+returning, `closing=false` at clip time 1.81s.
+
+### Checked
+
+Closes at **12.74s** of the 15.02s clip (configured 12.6s) and never during the
+earlier part; `pointer-events: none` so it can never eat a tap; `z-index: 4`, over
+the art and under the curl. The turn cue still arms with the iris closed, and the
+forward arrow stays at 0.92 opacity because the arrows live *outside* the book —
+the darkness cannot hide the way out. Reduced motion keeps the framing but drops
+the travel (`transition-duration: 0s`). Read-through clean, `errors: (none)`.
+
+---
+
+## 2026-08-10 — new Page 2 export: audio only, nothing to change
 
 Author replaced `Page 2.mp4`. It came in already committed, swept into `d3aafd8`
 alongside the pour-hand change, at the **same byte size** (5500730 → 5500730) but a
