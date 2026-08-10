@@ -211,7 +211,8 @@
      Guidance for HOW to turn the page: a 3D hand on the book's right edge does a
      right-to-left SWIPE, shown together with the "ghost" page-flip. JS positions
      it against the book's right side (see positionFlipHint) and toggles .show.
-     Draws the story's `handNudge` art when it sets one, else the SVG hand. */
+     ALWAYS the plain white SVG hand — the story's `handNudge` art is for the
+     cues that point into the illustration, not for this one. */
   .flip-hint {
     position: fixed; z-index: 720; pointer-events: none;
     width: clamp(56px, 7vw, 104px); height: auto;
@@ -220,8 +221,7 @@
     transition: opacity 320ms ease;
     will-change: transform;
   }
-  /* the built-in white hand — what this book uses, and the fallback if the
-     story's own `handNudge` art fails to load */
+  /* the built-in white hand — the only thing this cue ever draws */
   .flip-hint--svg { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
   .flip-hint svg  { display: block; width: 100%; height: auto; }
   .flip-hint.show { opacity: 0.96; visibility: visible;
@@ -233,14 +233,21 @@
     72%  { transform: translateX(-34px) rotate(-6deg) scale(0.92); }
     100% { transform: translateX(18px)  rotate(9deg)  scale(1);    }
   }
-  /* The RIGHT (forward) arrow blinks + glows GOLD while the nudge is playing —
-     "no need to swipe, this button turns the page too". */
-  .corner-arrow.blink { animation: arrowBlink 0.7s ease-in-out infinite; }
+  /* The RIGHT (forward) arrow glows GOLD while the nudge is playing — "no need
+     to swipe, this button turns the page too".
+     IT RUNS ON THE HAND'S BEAT: same 1.5s period, same easing, and its 45%/72%
+     keys are the hand's own — so the arrow flares exactly while the hand holds
+     at the end of its swipe (and the ghost peel holds at full lift), then
+     settles as they do. At its old 0.7s it beat 2.14× per swipe and the two
+     cues read as unrelated things happening at once. */
+  .corner-arrow.blink { animation: arrowBlink 1.5s cubic-bezier(0.4,0,0.2,1) infinite; }
   @keyframes arrowBlink {
-    0%, 100% { opacity: 0.35; transform: scale(1);
-               filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 4px  rgba(246,184,30,0.3)); }
-    50%      { opacity: 1;    transform: scale(1.14);
+    0%, 100% { opacity: 0.5; transform: scale(1);
+               filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 4px  rgba(246,184,30,0.28)); }
+    45%      { opacity: 1;   transform: scale(1.14);
                filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 16px rgba(246,184,30,0.95)); }
+    72%      { opacity: 1;   transform: scale(1.10);
+               filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 14px rgba(246,184,30,0.8)); }
   }
   /* One-shot 2s blink + GOLD GLOW played ONCE when a page's video fully ends
      (a "turn the page" cue). Pulses opacity AND a gold glow around the arrow. */
@@ -1084,7 +1091,7 @@
      target would hide it; POUR is a small disc, and a hand sitting under it
      read as pointing at the machine's body instead of at the button. */
   .pour-scene .pour-hint .scene-tap-hand {
-    width: 40%;              /* small enough that "POUR" still reads under it */
+    width: 34%;              /* small enough that "POUR" still reads under it */
     animation: handPressCentred 1.6s ease-in-out infinite;   /* shared with .anywhere */
   }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the

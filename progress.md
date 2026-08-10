@@ -13,35 +13,92 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — back to the plain white hand
+## 2026-08-10 (latest) — the nudge's three parts now run on one beat
 
-Author: "use the old hand nudge, the white one using in the start." The
-`assets/pages/hand nudge.webp` art added on 08-07 is out; every nudge draws the
-engine's built-in white SVG hand again — the page-turn hint, the "tap the
-screen" cue on page 5 and the POUR hint on page 6.
+Author: "sync the arrow and hand nudge animation coming together." They weren't.
+The page-turn nudge fires three things at once and two of them already shared a
+rhythm by accident:
 
-One line did it, which was the point of wiring the art through story.js instead
-of hard-coding it: **`handNudge` is now commented out** (left in place as the
-instructions for swapping art back in). `HAND_ART` comes back empty and
-`handMarkup()` returns the SVG.
+| part | period |
+|---|---|
+| hand swipe (`flipHintSwipe`) | 1.50s |
+| ghost peel (GSAP: 0.70 up + 0.15 hold + 0.60 down) | 1.45s |
+| **arrow glow (`arrowBlink`)** | **0.70s** |
 
-Two follow-ups the swap needed:
+So the arrow beat **2.14× per swipe** — never landing on the same frame twice,
+which is exactly what "not coming together" looks like. Three changes:
 
-- `.pour-scene .pour-hint .scene-tap-hand` goes **34% → 40%**. 34% was tuned to
-  the webp, which carries padding around its hand; the SVG is hand edge to edge,
-  so at 34% it read as a speck. 40% is the value this artwork always used.
-- The page-turn hint no longer requests **`engine/hand-nudge.png`**, a file that
-  has never existed here. It was reached through `HAND_ART || "engine/hand-nudge.png"`
-  and only became the white hand via the `<img>` error handler — a guaranteed
-  404 on every load. Now it builds the SVG element directly when the story
-  supplies no art, and the error handler stays for art that *is* set but fails.
+- **`arrowBlink` is now 1.5s** with the hand's own easing, and its bright keys
+  are the hand's own **45% and 72%** — the frames where the hand holds at the
+  end of its stroke and the peel holds at full lift. One gold flare per swipe,
+  held for as long as the hand holds. Trough raised 0.35 → 0.5 so the slower
+  cycle reads as a glow swelling, not the arrow disappearing.
+- **`NUDGE_SHOW_MS` 2000 → 3000**, expressed as `NUDGE_BEAT_MS * 2`. At 2000 the
+  cue died a third of the way into a second stroke the hand never finished.
+  Now it plays two whole beats and ends on the pose it started in.
+- **The peel re-fires on beat 2** (`peekTimers`, so an interaction still kills
+  it). It's one-shot; without this the second beat would be missing the page
+  lift the other two are timed against.
 
-Verified: no page errors, no failed hand request, 0 `<img>` hands and every
-`.scene-tap-hand` an `<svg>` with `fill="#ffffff"`, the flip hint a
-`.flip-hint--svg` div. On screen the page-5 cue is a 78px white hand centred on
-the machine's POUR button (44.94%/57.57% vs the 45.2%/58% target — the press
-animation accounts for the rest) and the page-6 hint a 43px hand on the button
-with the word still readable.
+The real bug was in the JS, and only a live probe found it: **`.blink1` was
+still on the arrow when the nudge started.** That's the one-shot 2s flash fired
+when a page's video ends; `dialogueDone` → `HINT_AFTER_DONE_MS` (2000) lands
+~50ms before `blink1` is removed at 2050. It's declared *after* `.blink` at the
+same specificity, so it won the `animation` property — the synced glow simply
+did not start until `blink1` was dropped, then trailed the hand by 50ms for the
+whole cue. `triggerHint` now removes `blink1` before adding `blink`.
+
+Verified: both animations report the same 1500ms period and the same
+`currentTime` in the same tick; sampled over one beat, the hand holds
+furthest-left 581–1082ms and the arrow holds full glow 631–1057ms — **midpoints
+12ms apart**, one flare per swipe; the peel lifts at 0ms and 1475ms. Under
+`reducedMotion: "reduce"` neither animation runs and the hand is still shown at
+0.96, so the guidance survives without the movement. Full read-through clean.
+
+A measurement note worth keeping: `Animation.startTime` is **null** for an
+animation caught in its first tick, and `Math.round(null)` is `0` — a
+"both started at 0" result proved nothing. `currentTime` is the honest one.
+
+---
+
+## 2026-08-10 — TWO hands: white on the book, artwork in the illustration
+
+Author: "use the old hand nudge, the white one using in the start" — then, once
+they saw it: **"do not change the interaction nudge, only change the book flip
+nudge."** So the split is now deliberate, not a fallback:
+
+| cue | hand |
+|---|---|
+| book-flip nudge (page corner + arrow) | the engine's plain white SVG |
+| tap hot-spots + POUR hint | `assets/pages/hand nudge.webp` |
+
+The reasoning behind the line: the flip nudge is about **the book** — swipe the
+paper, tap the arrow — so it belongs with the arrows and the progress dots as
+neutral chrome. The tap and pour cues point **into the illustration**, at a
+machine on a table, so they carry the story's own art. One hand doing both jobs
+made whichever art you picked wrong in one of the two places.
+
+So `flipHint` is now a plain `.flip-hint--svg` div built from `HAND_SVG` with no
+`handNudge` branch at all, while `handMarkup()` (tap spots + pour) keeps reading
+`HAND_ART`. `handNudge` stays in story.js, its comment now saying which cues it
+governs and which it does not.
+
+Two things that fell out of the round trip:
+
+- `.pour-scene .pour-hint .scene-tap-hand` is back at **34%**. It had gone to
+  40% for the SVG (hand edge to edge, so 34% read as a speck); the webp carries
+  padding, so 34% is its number. If you ever swap `handNudge` again, check this.
+- The book-flip hint no longer requests **`engine/hand-nudge.png`** — a file that
+  has never existed here. It used to be reached via
+  `HAND_ART || "engine/hand-nudge.png"` and only became the white hand through
+  the `<img>` error handler: a guaranteed 404 on every load, for the cue that was
+  always going to end up as the SVG anyway. Now it just builds the SVG.
+
+Verified: the flip hint is a `.flip-hint--svg` div holding an `<svg>`, every
+`.scene-tap-hand` is an `<img src="assets/pages/hand%20nudge.webp">`, nothing
+404s, no page errors; the POUR hint is the artwork at 38px with the word still
+readable; and the flip nudge still shares its 1500ms period and phase with the
+arrow, so the sync above survived the change.
 
 ---
 

@@ -314,11 +314,14 @@ function makeFx(fx, layer) {
    The scene player arms it when the scene lands (layer._pourArm), completion
    reports back through layer._pourDone, and resetScenes calls layer._pourReset
    so a revisit starts with an empty glass. */
-/* The pointing hand, shared by the page-turn nudge, the tap hot-spot and the
-   pour hint. Declared BEFORE the leaf builder — buildPourScene runs at load.
+/* The pointing hand for the IN-PAGE cues — the tap hot-spot and the pour hint.
+   Declared BEFORE the leaf builder: buildPourScene runs at load.
    The story supplies the artwork (`handNudge` in story.js, same idea as
    `playButton`); the inline SVG below is the fallback when it doesn't, so the
-   engine still works with no art at all. */
+   engine still works with no art at all.
+   The book-flip nudge does NOT use handMarkup() — see flipHint further down. It
+   is always HAND_SVG, so a story's art can point at the illustration without
+   also landing on the book's own chrome. */
 const HAND_ART = (window.STORY && STORY.handNudge) ? encodeURI(STORY.handNudge) : "";
 const HAND_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" ' +
@@ -2325,41 +2328,29 @@ function soundOn() {
    Timing: PAGE 1 after 5s, every later page after 10s of no interaction; repeats
    while idle and is cancelled by any tap / key / flip. Never on the last page.
    ========================================================================== */
-// The nudge is a HAND on the RIGHT side of the book — the story's own artwork
-// (`handNudge`) when it supplies one, otherwise the built-in white SVG hand,
-// the same one the in-page tap spots draw. If the story's art fails to load
-// the error handler swaps the SVG in, so the cue is never missing.
-let flipHint;
-if (HAND_ART) {
-  flipHint = document.createElement("img");
-  flipHint.className = "flip-hint";
-  flipHint.alt = "";
-  flipHint.decoding = "async";
-  flipHint.src = HAND_ART;
-  flipHint.addEventListener("error", function () {
-    const el = svgFlipHint();
-    if (flipHint.parentNode) flipHint.parentNode.replaceChild(el, flipHint);
-    flipHint = el;               // later show/position calls use the swapped-in element
-  }, { once: true });
-} else {
-  flipHint = svgFlipHint();
-}
+// The nudge is a HAND on the RIGHT side of the book, and it is ALWAYS the plain
+// white SVG hand — deliberately NOT the story's `handNudge` artwork. This cue is
+// about the book itself (swipe the paper / tap the arrow), so it stays neutral
+// chrome; `handNudge` belongs to the cues that point INTO the illustration (the
+// tap hot-spots and the pour hint), which is where handMarkup() uses it.
+const flipHint = document.createElement("div");
+flipHint.className = "flip-hint flip-hint--svg";
 flipHint.setAttribute("aria-hidden", "true");
+flipHint.innerHTML = HAND_SVG;
 document.body.appendChild(flipHint);
-function svgFlipHint() {
-  const el = document.createElement("div");
-  el.className = "flip-hint flip-hint--svg";
-  el.setAttribute("aria-hidden", "true");
-  el.innerHTML = HAND_SVG;       // same hand as the in-page tap spot
-  return el;
-}
 
 // Guidance timing: the nudge NEVER interrupts a scene — it appears only after
 // the page's dialogue/scene sequence has fully finished (dialogueDone below),
 // waits HINT_AFTER_DONE_MS more, then plays. It repeats every NUDGE_GAP_MS
 // until the reader turns the page; any interaction resets it.
 const HINT_AFTER_DONE_MS = 2000;  // breathing room after the scene completes
-const NUDGE_SHOW_MS = 2000;    // how long one nudge stays on screen
+// The three parts of the nudge share ONE beat: the hand's swipe keyframes are
+// 1.5s, the ghost peel is 0.70 + 0.15 + 0.60 = 1.45s, and the arrow's glow now
+// matches at 1.5s. Keep NUDGE_SHOW_MS a whole multiple of the beat or the cue
+// vanishes mid-swipe — at the old 2000ms the hand was cut a third of the way
+// into a second stroke it never finished.
+const NUDGE_BEAT_MS = 1500;    // one swipe / one peel / one arrow flare
+const NUDGE_SHOW_MS = NUDGE_BEAT_MS * 2;   // two complete beats, then it hides
 const NUDGE_GAP_MS  = 9000;    // gap after it disappears before it plays again
 let idleHintTimer = null;
 let nudgeHideTimer = null;
@@ -2466,13 +2457,28 @@ function peekFlip() {
   }, 760 + 760));
 }
 
-// Play the nudge ONCE — hand swipe on the book's right + ghost page-flip + the
-// right arrow blinks — hold ~2s, then hide and come back 9s later. Repeats while idle.
+// Play the nudge — hand swipe on the book's right + ghost page-flip + the right
+// arrow flaring gold, ALL STARTED IN THE SAME TICK so they share phase, for two
+// beats; then hide and come back 9s later. Repeats while idle.
 function triggerHint() {
   if (!canShowHint()) { idleHintTimer = setTimeout(triggerHint, NUDGE_GAP_MS); return; }
   showFlipHint();
   peekFlip();
-  if (cornerNext) cornerNext.classList.add("blink");
+  if (cornerNext) {
+    // The end-of-video one-shot (.blink1, 2s) is still on the arrow for the
+    // last ~50ms of its life when the nudge fires at HINT_AFTER_DONE_MS, and it
+    // is declared after .blink at the same specificity — so it WINS the
+    // `animation` property and holds the synced glow off for those 50ms, which
+    // then lags the hand by 50ms for the rest of the cue. Drop it first.
+    cornerNext.classList.remove("blink1");
+    cornerNext.classList.add("blink");
+  }
+  // The hand and the arrow loop on their own; the peel is one-shot, so re-fire
+  // it on the second beat or that beat would be missing the page lift the other
+  // two are timed against. Parked in peekTimers so any interaction cancels it.
+  for (var b = 1; b * NUDGE_BEAT_MS < NUDGE_SHOW_MS; b++) {
+    peekTimers.push(setTimeout(peekFlip, b * NUDGE_BEAT_MS));
+  }
   clearTimeout(nudgeHideTimer);
   nudgeHideTimer = setTimeout(function () {
     hideFlipHint();
