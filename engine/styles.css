@@ -1008,10 +1008,12 @@
   @media (prefers-reduced-motion: reduce) {
     .scene-tap-ring, .scene-tap-spot::after, .scene-tap-hand { animation: none; }
     .scene-tap-hand { transform: translate(-4%, 86%); }
-    /* the centred variants are 3-class selectors, so they need matching
-       specificity here or they'd keep animating for readers who asked not to */
-    .scene-tap.anywhere .scene-tap-hand,
-    .pour-scene .pour-hint .scene-tap-hand {
+    /* the centred variant is a 3-class selector, so it needs matching
+       specificity here or it'd keep animating for readers who asked not to.
+       (The POUR hint's hand is the same shape but its rule is declared further
+       down the file, so its override has to live down there too — see the note
+       beside .pour-scene .pour-hint .scene-tap-hand.) */
+    .scene-tap.anywhere .scene-tap-hand {
       animation: none; transform: translate(-50%, -50%);
     }
   }
@@ -1093,6 +1095,16 @@
   .pour-scene .pour-hint .scene-tap-hand {
     width: 34%;              /* small enough that "POUR" still reads under it */
     animation: handPressCentred 1.6s ease-in-out infinite;   /* shared with .anywhere */
+  }
+  /* …and the reduced-motion override MUST sit here, AFTER that rule — not with
+     the other cue overrides up in the scene-tap section. Both selectors are three
+     classes, so specificity is a tie and the LATER one wins; an override placed
+     earlier in the file silently loses and the hand keeps nudging for a reader
+     who asked for less motion. That is exactly how this one was broken. */
+  @media (prefers-reduced-motion: reduce) {
+    .pour-scene .pour-hint .scene-tap-hand {
+      animation: none; transform: translate(-50%, -50%);
+    }
   }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the
      glass) — hidden until their word, then a springy pop-in. */

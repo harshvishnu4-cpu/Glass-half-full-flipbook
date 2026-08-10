@@ -13,7 +13,75 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — page 5 part 2 is the VIDEO again, and two lost filenames
+## 2026-08-10 (latest) — the new desk art, and a bug sweep
+
+Author: "I've updated the new table, use it in the book background — and check for
+bugs, fix all the bugs."
+
+### The desk
+
+`index.html` paints the body from **`assets/table.webp`**, a webp twin of the
+editable `assets/table.png` (the comment there has always said so). The PNG had
+been replaced with the new, wider-framed desk — candle, spider and spellbooks now
+fully in frame — but **the twin was still the 08-06 file**, so the book was still
+showing the old desk. Regenerated it from the new PNG at full 1920×1080.
+
+Quality picked by matching the old twin's weight rather than guessing: 0.72 → 60KB,
+0.78 → 74KB, 0.82 → 89KB, **0.88 → 134KB**, and the old twin was 134KB. So the new
+desk costs nothing extra (from a 2187KB source). Verified the *painted* background
+is 0.42% from the current `table.png` — i.e. webp noise, not the old art.
+
+### Bugs found and fixed
+
+- **`sfx/BG Music.mp3` was missing** and `story.js` still referenced it, so the
+  book played silent and every read-through logged `load fail: BG Music.mp3`. It
+  had been swept into commit `0928a65` by a `git add -A`. Restored from
+  `0928a65^`. The read-through now reports **`errors: (none)`** for the first time
+  in this session, and the music is confirmed playing and looping (`paused false`,
+  `t 3.48s`, `loop true`, volume 0.06 because narration was ducking it).
+- **Reduced motion was ignored for the POUR hint's hand** — a real cascade bug.
+  `.pour-scene .pour-hint .scene-tap-hand { animation: handPressCentred … }` is
+  declared at line ~1093, while its reduced-motion override sat back at ~1014 with
+  the other cue overrides. Both selectors are **three classes**, so specificity is
+  a tie and the *later* rule wins: the override silently lost and the hand kept
+  nudging for a reader who had asked for less motion. Moved the override to sit
+  immediately AFTER the rule, with a comment saying why it must live there.
+  This is the same trap logged on 08-07 — the fix then added matching specificity
+  but put it in the wrong place in the file. Specificity was never the whole story;
+  **order breaks the tie.**
+  Checked both directions afterwards, because "disable it" is easy to overdo:
+  under `no-preference` the hand still runs `handPressCentred`; under `reduce` its
+  `animation-name` is `none` and `getAnimations()` is empty. Same 38.08px width in
+  both, so nothing else moved.
+
+### Clean
+
+26 asset references resolve **case-exact** (the check tests each path segment
+against the real directory listing — Windows hides mismatches that 404 on Linux
+hosting). All 12 clips decode and every poster matches its frame 0 (0.56–1.2%).
+`story.js` duration comments match the files. Across 10 viewports from 3440×1440 to
+568×320: the book fits, the arrow glyphs clear the book by 3–6px, the back-cover lip
+stays 10–46px inside it, no sideways scroll, tap targets 56–124px. Back-navigation
+works twice in a row. No page errors anywhere, in any mode.
+
+### A false positive worth remembering
+
+The asset audit first reported `speech_bubble.png` MISSING. It isn't — it is a CSS
+`url()`, and **CSS urls resolve relative to the stylesheet**, not the project root,
+so `engine/speech_bubble.png` was right there. Fixed the checker to use each
+reference's own base directory. Had I reported that as a bug it would have sent the
+author looking for a file that exists.
+
+### Still the author's call
+
+`assets/pages/Page 4.mp4` on disk is the pre-08-10 export (`4415648b`); the
+re-recorded narration committed in `e9faa33` (`ca3b7fe7`) is in Downloads as
+`Page 4 (2).mp4`. Picture and duration are identical, only the audio differs. Not
+touched — see the entry below.
+
+---
+
+## 2026-08-10 — page 5 part 2 is the VIDEO again, and two lost filenames
 
 Author: "again add the old page 5 part 2 video in the book." Restored from
 **`3a1cb92^`** — the deletion had been *committed*, so `git checkout HEAD --` can't
