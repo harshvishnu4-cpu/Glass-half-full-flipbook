@@ -1170,13 +1170,21 @@
   /* the "tap here" ring reuses the scene-tap look; never intercepts the tap */
   .pour-scene .pour-hint { position: absolute; pointer-events: none;
                            transition: opacity 300ms ease; }
-  /* …but the HAND is CENTRED on the POUR button here, not hung below it as it
-     is elsewhere. The shared cue points at big scenery, where a hand over the
-     target would hide it; POUR is a small disc, and a hand sitting under it
-     read as pointing at the machine's body instead of at the button. */
+  /* The hand points at the POUR button from just BELOW it, so the word stays
+     readable. It used to be centred on the disc at 34% — measured, that put the
+     hand across y 50.9–57.6% of the page against a button spanning 48.4–58.9%,
+     i.e. over 63% of the button including the label, and "POUR" read as "P**R".
+     Bigger AND lower: 48% wide, and the press translate moved from -44%/-56% of
+     its own height to +25%/+13%, which lands the fingertip on the disc's lower
+     third with the label clear above it. Its own keyframes now, because the
+     shared handPressCentred still belongs to the tap-anywhere cue. */
   .pour-scene .pour-hint .scene-tap-hand {
-    width: 34%;              /* small enough that "POUR" still reads under it */
-    animation: handPressCentred 1.6s ease-in-out infinite;   /* shared with .anywhere */
+    width: 48%;
+    animation: pourHandPress 1.6s ease-in-out infinite;
+  }
+  @keyframes pourHandPress {
+    0%, 100% { transform: translate(-50%, 25%) scale(1);    }
+    50%      { transform: translate(-50%, 13%) scale(0.93); }
   }
   /* …and the reduced-motion override MUST sit here, AFTER that rule — not with
      the other cue overrides up in the scene-tap section. Both selectors are three
@@ -1185,7 +1193,10 @@
      who asked for less motion. That is exactly how this one was broken. */
   @media (prefers-reduced-motion: reduce) {
     .pour-scene .pour-hint .scene-tap-hand {
-      animation: none; transform: translate(-50%, -50%);
+      /* park it at the animation's RESTING pose, not at centre — parking it at
+         -50% would jump the hand back over the label for exactly the readers who
+         opted out of motion */
+      animation: none; transform: translate(-50%, 25%);
     }
   }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the

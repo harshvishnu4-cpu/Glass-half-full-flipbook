@@ -13,7 +13,46 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the load glitch: the book flashed at HALF SIZE
+## 2026-08-10 (latest) — the POUR hand moved down and grew
+
+Author, with a screenshot: the hand covers the button, so "POUR" reads as "P**R".
+It did. Measured against the page:
+
+| | before | after |
+|---|---|---|
+| hand width | 38.08px (34%) | **53.75px (48%)** — +41% |
+| hand spans | y 50.93 – 57.56% | **y 56.19 – 65.55%** |
+| overlap with the button | 6.63% = **63% of its height** | 2.73% = **26%** |
+
+The button spans y 48.39–58.92% with its label in the middle band, so anything
+above ~54% sits on the word. The hand is positioned by a translate expressed in
+its OWN height, which makes the move arithmetic rather than guesswork:
+`handTop = spotCentre + translateY × handHeight`. Checked against the old numbers
+(53.85 − 0.44 × 6.63 = 50.93 ✓), then solved for a top of ~56%: **translateY goes
+from −44%/−56% to +25%/+13%**, keeping the original 12%-of-height press travel.
+
+It gets **its own `pourHandPress` keyframes** rather than editing the shared
+`handPressCentred`, which still belongs to the tap-anywhere cue on page 5 — that
+one is centred on its target on purpose and must not move.
+
+The reduced-motion override needed changing too: it parked the hand at
+`translate(-50%, -50%)`, which after this change would have snapped it back over
+the label for exactly the readers who opted out of motion. It now parks at the
+animation's resting pose. Verified in both modes — normal 55.5%, reduced 56.19%,
+both below the label, and the fingertip still overlaps the disc's lower third at
+both keyframes so it still reads as pointing AT the button rather than at the
+machine's body. Read-through clean.
+
+One measurement note: a first attempt screenshotted the closed cover, because the
+pour layer exists in the DOM from load but is behind the cover — the crop was
+computed from an element that is not on screen. The numbers were fine (they are in
+the layer's own coordinates); only the picture was wrong. And an "is it bigger"
+assertion compared px across two different render contexts and reported a false
+failure; the honest comparison is same-context, 38.08 → 53.75px.
+
+---
+
+## 2026-08-10 — the load glitch: the book flashed at HALF SIZE
 
 Author: "there is a glitch when the flipbook loads." There was, and it is fixed —
 but three plausible-looking diagnoses had to be **disproved** first, which is the
