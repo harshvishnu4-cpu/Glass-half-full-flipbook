@@ -120,8 +120,9 @@ window.STORY = {
           // at: ON THE MACHINE (its centre in this clip is x 45.2%), not off in
           // the empty table space it used to sit in — a tap anywhere still
           // counts (`anywhere` drops the targeting ring), but the hand now
-          // draws the eye to the thing the story is about.
-          tap: { after: 5100, anywhere: true, at: { x: "45.2%", y: "58%" },
+          // draws the eye to the thing the story is about. y 79% puts it low on
+          // the machine, over the dispensing bay rather than across its middle.
+          tap: { after: 5100, anywhere: true, at: { x: "45.2%", y: "79%" },
                  label: "Tap the screen to pour the juice" } },
         { src: "assets/pages/Page 5 part 3.mp4" },              // 8.5s — it pours
     ] },
