@@ -13,82 +13,57 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — page 5 scene 2 implemented from Figma (node 756:4)
+## 2026-08-10 (latest) — page 5 part 2 is the VIDEO again, and two lost filenames
 
-Author: implement Figma "The Glass Half Full LBDs" node **756:4** ("Slide 16:9 -
-693") as page 5 part 2. The design is two layers on a 1920×1080 frame:
+Author: "again add the old page 5 part 2 video in the book." Restored from
+**`3a1cb92^`** — the deletion had been *committed*, so `git checkout HEAD --` can't
+find the file; it has to come from the parent of the commit that removed it.
+`assets/pages/Page 5 part 2.mp4` (876KB) and its poster (41KB) are both back, and
+story.js was already pointed at the mp4 again with the original cue at `x 45.2%`,
+which is the right number for the clip (the Figma version had centred the machine
+at 49.45%; the clip has it at 45.23%).
 
-| node | what | box |
-|---|---|---|
-| 756:6 | background | 0,0 · 1920×1080 (full-bleed) |
-| 756:7 | machine | left 632, top 19 · 657×987 |
-| 756:5 | machine again | left **−382** — off-canvas, not visible, **not rendered** |
+### What the reverted Figma/composed version left behind
 
-That replaces `Page 5 part 2.mp4` — a good clip to lose: sampled at 9 points
-across its 8.47s, **the machine's box was pixel-identical every time** (25736–25739
-purple pixels, same x/y/w/h). It was 876KB of video carrying a still and a voice.
+That scene had briefly been built from `background.png` + `machine.png` + a
+narration file (Figma node 756:4). It is no longer live. Leftovers, all harmless:
 
-### The assets were already in the repo
+- **`layers` and `sound` in the engine are now unused.** Both are general scene
+  options — `layers` places art over a scene's base image at `at:{x,y,w}` in page
+  %, `sound` gives a scene its own narration — documented and completely inert
+  when no scene sets them. Say the word and they come out.
+- **`assets/audios/page 5 part 2.wav` is committed and unused.** Worth keeping: it
+  is the only copy of that spoken line outside the mp4, decoded straight from the
+  clip's audio track with its time origin intact.
+- `background.png` / `machine.png` are deleted from the working tree, which is
+  consistent — nothing references them now.
 
-`download_assets` returned the node's raw images, and **SHA1 says they are byte
-for byte the files the author had already added**: `background.png` =
-`20cf67b4016b4f62`, `machine.png` = `1817660284d739d1`. So the scene points at the
-project's own copies rather than a second set — that is the project's data source,
-not a substitution.
+### Two file-name accidents found while doing it
 
-### Translating the design into the engine's units
+Both have the same cause: re-downloading a file while the original is still there,
+so Windows appends " (2)", and then the plain-named one gets deleted.
 
-The reference code is React + Tailwind with absolute px; this engine has neither.
-Everything becomes % of the page, which `fitScale` then scales:
+- **`Page 2.mp4` was MISSING** — story.js pointed at it and page 2 would have been
+  blank — while `Page 2 (2).mp4` sat beside it. Renamed back. Zero risk, because
+  SHA1 says the "(2)" file is **byte-identical** (`50dc61fe47de5133`) to the
+  `Page 2.mp4` already in git: this restored a *filename*, not content. git agrees
+  — it stopped reporting the file as deleted.
+- **`Page 4.mp4` on disk is the PRE-08-10 export** (`4415648b9f7b00cb`, the version
+  from `42ec59d`). The re-recorded narration committed in `e9faa33`
+  (`ca3b7fe799e461cd`) is in Downloads as `Page 4 (2).mp4`. **Deliberately left
+  alone.** Picture and duration are identical between the two — only the audio
+  differs (diff RMS 0.051, speech onset 0.08s on disk vs 0.40s in the committed
+  one) — and since this very turn was a request to go *back* to an older take, it
+  is not safe to assume which one is wanted. Flagged for the author instead of
+  guessed at. The poster matches frame 0 either way (0.86%), the picture being
+  unchanged.
 
-- left 632/1920 = **32.92%**, top 19/1080 = **1.76%**, width 657/1920 = **34.22%**
-- Height is left to the art. 657×987 is `machine.png`'s 342×514 scaled **1.9211×**
-  in width and 1.9203× in height — uniform within rounding — so the width alone
-  reproduces the design and the png keeps its own aspect.
+### The check that caught it
 
-Measured back off the live page at the design's own 1920×1080: **left 632.1,
-top 19.0, 657×987.5** against the node's 632/19/657×987, and the machine's purple
-body lands on the export's to **0.00%** in x, y, w and h. Whole frame vs the design
-export: **0.36% mean**.
-
-### The cue had to move, and the narration had to be rescued
-
-- **`tap.at.x` 45.2% → 49.5%.** The design CENTRES the machine: its body's centre
-  is x 49.45%, where the old clip had it at 45.23%. A cue left at 45.2% would have
-  pointed at bare table. Everything else about the cue is unchanged.
-- **The spoken line was baked into the video.** Deleting the clip without lifting
-  it out would have left a scene that looked right and said nothing. Decoded the
-  mp4's audio track to `assets/audios/page 5 part 2.wav` (48kHz mono, 5.40s,
-  506KB), keeping the original time origin — speech still starts at 0.86s and ends
-  at 5.0s — and cutting only 3.07s of trailing silence, because `tap.after: 5100`
-  is fitted to that timeline. Live, the cue now appears with the narration at
-  **5.05s**, right after the last word.
-
-### Two engine options this needed (both general, not page-5 specific)
-
-- **`layers: [{ src, at: {x, y, w} }]`** — art placed over a scene's base image in
-  % of the page, exactly like the pour scene's machine. `height: auto`, so `w` is
-  the single knob. A still scene can be assembled from parts instead of baked flat.
-- **`sound`** — a scene's own narration, for a scene with no clip to carry it.
-  Built at leaf-build time so it PRELOADS; an `<audio>` element rather than fetch +
-  Web Audio (fetch is blocked on `file://`, and this book must work when index.html
-  is double-clicked). Ducks the music, `catch`-wrapped so a blocked line can't
-  strand the scene, paused when the scene dissolves out (or it keeps talking under
-  the 1.1s dissolve), rewound in `resetScenes`.
-
-Verified live: no page errors, nothing 404s, the machine layer renders 434×652 and
-decodes, the line starts at **1101ms** — as the cross-dissolve completes, the same
-moment the clip used to start — the cue lands at 6199ms, tapping advances to scene
-3 and stops the audio, a reset rewinds it. Read-through clean.
-
-### Note for the author
-
-`background.png` is the same picture as `assets/pages/pour/bg.webp` (0.3% apart —
-webp noise) at **1007KB against 25KB**. `src` points at the design's own PNG as
-asked; switching that one line makes this change a net **184KB smaller** than the
-video it replaced instead of 798KB larger. `machine.png` at 342×514 is upscaled
-1.92× by the design itself, so it is soft at 1080p — the design asks for 657×987
-and a matching export would sharpen it.
+Walking every path `story.js` references and testing **each path segment against
+the real directory listing** catches both a missing file and a case-only mismatch
+(the latter works on Windows and 404s on Vercel). It found `Page 2.mp4` here — and
+`sfx/BG Music.mp3`, still absent, so the book still plays silent.
 
 ---
 

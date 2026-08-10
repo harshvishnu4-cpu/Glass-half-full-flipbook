@@ -924,17 +924,6 @@
     -webkit-touch-callout: none;   /* iOS: no long-press "Save Image / Copy" callout */
     pointer-events: auto;          /* keep tap-to-play on videos */
   }
-  /* `layers` — art composed ON TOP of a scene's base image, placed in % of the
-     page (left/top/width set inline from `at`), so it rides the book's one
-     responsive scale exactly as the pour scene's machine does. Height is auto:
-     the width is the single knob, and the art keeps its own aspect. */
-  .scene-layer {
-    position: absolute; height: auto; display: block;
-    pointer-events: none;
-    -webkit-user-drag: none; user-drag: none;
-    -webkit-user-select: none; user-select: none;
-    -webkit-touch-callout: none;
-  }
   /* SCENES — one page can hold several storyboard screens stacked full-bleed.
      script.js cross-DISSOLVES between them (LXD rule: 1.1s — keep in sync with
      DISSOLVE_MS there) and pops each scene's bubble in as its scene appears. */
