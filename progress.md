@@ -13,7 +13,71 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the nudge's three parts now run on one beat
+## 2026-08-10 (latest) — Page 6 + Page 8 replaced; nothing needed retiming
+
+Author replaced two clips (swept into commit `42ec59d`). **No code changes were
+needed** — but only because I measured what changed rather than assuming.
+
+The byte deltas were `+55` on Page 6 and `-1645` on Page 8, which looks like a
+re-mux, so my first read was "metadata only". Wrong. Diffing 21 sampled frames
+and the decoded PCM of each against the previous committed version:
+
+| | picture | audio | duration |
+|---|---|---|---|
+| Page 6 | identical at all 21 frames | **opening line re-recorded** | 16.643s, same |
+| Page 8 | **caption typo fixed** | bit-identical | 16.39s, same |
+
+- **Page 8** is a picture-only fix: the baked caption's double space,
+  `It is  getting late.` → `It is getting late.`, from ~10.75s to the end.
+  Localised by diff bbox to x 29.9% / y 3.9% / w 18.3% — the speech bubble.
+  Audio diff RMS 0.00036 (AAC noise).
+- **Page 6** is an audio-only change: the first line is a different take that
+  starts ~0.25s later. The envelope is *bit-identical from 4.5s on*, so only
+  that opening line was replaced. Audio diff RMS 0.066 against a signal RMS of
+  0.083, with a max per-sample difference of 1.38 — uncorrelated, not a re-level.
+
+Why nothing had to move:
+
+- **Posters still equal frame 0** — 0.86% and 0.75% off, inside the 0.56–1.2%
+  webp-noise band that the ten *untouched* clips also sit in. No regeneration.
+- **Page 6's final frame is unchanged**, so the template-matched `machineAt` /
+  `buttonAt` / `glassAt` still land where the video leaves the machine. That
+  alignment was the one thing a new Page 6 export could have silently broken.
+- **Durations unchanged**, so Page 8's `// 16s` note and the pour hand-off stand.
+- **Casing is right.** git reports both as *modified*, not delete + add — the trap
+  from 08-07, when a re-export landed as `page 2.mp4` and would have 404'd on
+  Vercel while working perfectly on Windows.
+
+Full read-through clean: cover → THE END, the page-5 tap, all four pours, one
+video at a time.
+
+Three measurement lessons, all of which nearly produced a wrong answer:
+
+- **A tiny byte delta does not mean a tiny change.** Page 6 grew by 55 bytes and
+  had a whole line re-recorded.
+- **Do not sample audio through `requestAnimationFrame`.** My first old-vs-new
+  RMS comparison played both clips separately and binned by rAF tick, so frame
+  jitter put the same audio in different bins; it reported "the audio DIFFERS"
+  for Page 8, which is bit-identical. `decodeAudioData` + direct sample
+  comparison is the honest tool and it is not slower.
+- **A threshold picked from the peak found the ambience, not the last word.** An
+  8%-of-peak "is it speech" test said Page 6's narration runs to 16.25s, leaving
+  0.39s of tail, and I nearly reported the 1.1s cross-dissolve as clipping it.
+  It isn't: a scene that advances on `ended` has *finished playing* before the
+  dissolve starts (see the comment at `goNextScene`), and the figure was
+  identical in the old take anyway. Check whether a number is a *regression*
+  before treating it as a *defect*.
+
+### Still outstanding, not mine to decide
+
+`sfx/BG Music.mp3` was deleted in commit `0928a65` while `story.js:78` still
+points at it, so the book now loads with a failing request and plays silent.
+Restore with `git checkout 0928a65^ -- "sfx/BG Music.mp3"`, or drop the `music:`
+line for deliberate silence.
+
+---
+
+## 2026-08-10 — the nudge's three parts now run on one beat
 
 Author: "sync the arrow and hand nudge animation coming together." They weren't.
 The page-turn nudge fires three things at once and two of them already shared a
