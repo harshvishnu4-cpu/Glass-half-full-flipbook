@@ -2326,24 +2326,33 @@ function soundOn() {
    while idle and is cancelled by any tap / key / flip. Never on the last page.
    ========================================================================== */
 // The nudge is a HAND on the RIGHT side of the book — the story's own artwork
-// (`handNudge`) when it supplies one, otherwise the engine's optional
-// engine/hand-nudge.png, and failing both the inline SVG hand (swapped in by
-// the <img> error handler) so the cue is never missing.
-let flipHint = document.createElement("img");
-flipHint.className = "flip-hint";
+// (`handNudge`) when it supplies one, otherwise the built-in white SVG hand,
+// the same one the in-page tap spots draw. If the story's art fails to load
+// the error handler swaps the SVG in, so the cue is never missing.
+let flipHint;
+if (HAND_ART) {
+  flipHint = document.createElement("img");
+  flipHint.className = "flip-hint";
+  flipHint.alt = "";
+  flipHint.decoding = "async";
+  flipHint.src = HAND_ART;
+  flipHint.addEventListener("error", function () {
+    const el = svgFlipHint();
+    if (flipHint.parentNode) flipHint.parentNode.replaceChild(el, flipHint);
+    flipHint = el;               // later show/position calls use the swapped-in element
+  }, { once: true });
+} else {
+  flipHint = svgFlipHint();
+}
 flipHint.setAttribute("aria-hidden", "true");
-flipHint.alt = "";
-flipHint.decoding = "async";
-flipHint.src = HAND_ART || "engine/hand-nudge.png";
-flipHint.addEventListener("error", function () {
+document.body.appendChild(flipHint);
+function svgFlipHint() {
   const el = document.createElement("div");
   el.className = "flip-hint flip-hint--svg";
   el.setAttribute("aria-hidden", "true");
   el.innerHTML = HAND_SVG;       // same hand as the in-page tap spot
-  if (flipHint.parentNode) flipHint.parentNode.replaceChild(el, flipHint);
-  flipHint = el;                 // later show/position calls use the swapped-in element
-}, { once: true });
-document.body.appendChild(flipHint);
+  return el;
+}
 
 // Guidance timing: the nudge NEVER interrupts a scene — it appears only after
 // the page's dialogue/scene sequence has fully finished (dialogueDone below),

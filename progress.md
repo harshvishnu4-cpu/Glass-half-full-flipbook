@@ -13,7 +13,39 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the nav arrows were sitting ON the book
+## 2026-08-10 (latest) — back to the plain white hand
+
+Author: "use the old hand nudge, the white one using in the start." The
+`assets/pages/hand nudge.webp` art added on 08-07 is out; every nudge draws the
+engine's built-in white SVG hand again — the page-turn hint, the "tap the
+screen" cue on page 5 and the POUR hint on page 6.
+
+One line did it, which was the point of wiring the art through story.js instead
+of hard-coding it: **`handNudge` is now commented out** (left in place as the
+instructions for swapping art back in). `HAND_ART` comes back empty and
+`handMarkup()` returns the SVG.
+
+Two follow-ups the swap needed:
+
+- `.pour-scene .pour-hint .scene-tap-hand` goes **34% → 40%**. 34% was tuned to
+  the webp, which carries padding around its hand; the SVG is hand edge to edge,
+  so at 34% it read as a speck. 40% is the value this artwork always used.
+- The page-turn hint no longer requests **`engine/hand-nudge.png`**, a file that
+  has never existed here. It was reached through `HAND_ART || "engine/hand-nudge.png"`
+  and only became the white hand via the `<img>` error handler — a guaranteed
+  404 on every load. Now it builds the SVG element directly when the story
+  supplies no art, and the error handler stays for art that *is* set but fails.
+
+Verified: no page errors, no failed hand request, 0 `<img>` hands and every
+`.scene-tap-hand` an `<svg>` with `fill="#ffffff"`, the flip hint a
+`.flip-hint--svg` div. On screen the page-5 cue is a 78px white hand centred on
+the machine's POUR button (44.94%/57.57% vs the 45.2%/58% target — the press
+animation accounts for the rest) and the page-6 hint a 43px hand on the button
+with the word still readable.
+
+---
+
+## 2026-08-10 — the nav arrows were sitting ON the book
 
 Author: the back/forward arrows overlap the book. They did — **on 8 of the 10
 test viewports**, the gold glyph intruded 8–20px onto the book's frame.

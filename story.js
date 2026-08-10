@@ -67,9 +67,10 @@ window.STORY = {
   playAt: { x: "50%", y: "77%" },
 
   // The pointing hand used by EVERY nudge — the page-turn hint, the "tap the
-  // screen" cue and the POUR hint. Remove this line and the engine falls back
-  // to its own plain white hand.
-  handNudge: "assets/pages/hand nudge.webp",
+  // screen" cue and the POUR hint. With no line here the engine draws its own
+  // plain white hand, which is what this book uses. Point it at an image in
+  // assets/ to swap in your own artwork everywhere at once:
+  // handNudge: "assets/pages/hand nudge.webp",
 
   // Looping background music (any file in sfx/). Remove this line for silence.
   music: "sfx/BG Music.mp3",

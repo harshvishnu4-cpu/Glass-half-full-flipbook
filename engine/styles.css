@@ -211,7 +211,7 @@
      Guidance for HOW to turn the page: a 3D hand on the book's right edge does a
      right-to-left SWIPE, shown together with the "ghost" page-flip. JS positions
      it against the book's right side (see positionFlipHint) and toggles .show.
-     Optional art at engine/hand-nudge.png; until then an emoji hand is used. */
+     Draws the story's `handNudge` art when it sets one, else the SVG hand. */
   .flip-hint {
     position: fixed; z-index: 720; pointer-events: none;
     width: clamp(56px, 7vw, 104px); height: auto;
@@ -220,7 +220,8 @@
     transition: opacity 320ms ease;
     will-change: transform;
   }
-  /* inline-SVG hand fallback (used when engine/hand-nudge.png isn't present) */
+  /* the built-in white hand — what this book uses, and the fallback if the
+     story's own `handNudge` art fails to load */
   .flip-hint--svg { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
   .flip-hint svg  { display: block; width: 100%; height: auto; }
   .flip-hint.show { opacity: 0.96; visibility: visible;
@@ -1083,7 +1084,7 @@
      target would hide it; POUR is a small disc, and a hand sitting under it
      read as pointing at the machine's body instead of at the button. */
   .pour-scene .pour-hint .scene-tap-hand {
-    width: 34%;              /* small enough that "POUR" still reads under it */
+    width: 40%;              /* small enough that "POUR" still reads under it */
     animation: handPressCentred 1.6s ease-in-out infinite;   /* shared with .anywhere */
   }
   /* STICKERS that pop while the reward line plays ("Full" + the arrow to the
