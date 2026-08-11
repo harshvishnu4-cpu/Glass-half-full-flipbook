@@ -144,10 +144,36 @@
       var el = document.documentElement;
       var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
       if (!go || document.fullscreenElement || document.webkitFullscreenElement) return;
-      try {
-        var p = go.call(el, { navigationUI: 'hide' });
-        if (p && p.catch) p.catch(function () {});   // refused → play windowed
-      } catch (e) {}
+      // Ask the book to paint the same pink over the WHOLE screen first, and WAIT
+      // for it to confirm. The wipe only covers this frame; the frame growing from
+      // a page-sized box to the screen is plainly visible around it unless
+      // everything else is already the same colour. Posting and switching in the
+      // same breath gave the mask under one frame, so it never actually showed.
+      var went = false;
+      function go2() {
+        if (went) return;
+        went = true;
+        // The splat is sized to the CURRENT viewport, so after the switch it no
+        // longer reaches the enlarged corners and the page background shows there
+        // — which is what made the change noticeable. Paint the page itself the
+        // same pink for the duration of the wipe: it sits behind everything, so
+        // the drain still reveals the scene, but the corners are pink meanwhile.
+        var prev = el.style.background;
+        el.style.background = '#F77ADE';
+        setTimeout(function () { el.style.background = prev; }, 2600);
+        try {
+          var p = go.call(el, { navigationUI: 'hide' });
+          if (p && p.catch) p.catch(function () {});   // refused → play windowed
+        } catch (e) {}
+      }
+      if (window.parent === window) { go2(); return; } // not framed → nothing to mask
+      window.addEventListener('message', function onMsg(ev) {
+        if (!ev.data || ev.data.source !== 'book' || ev.data.type !== 'masked') return;
+        window.removeEventListener('message', onMsg);
+        go2();
+      });
+      try { window.parent.postMessage({ source: 'lbd', type: 'covered' }, '*'); } catch (e) {}
+      setTimeout(go2, 250);                            // no ack → go regardless
     }
 
     // SWITCH WHILE THE SPLASH COVERS THE SCREEN, so the resize is never seen.
@@ -187,6 +213,32 @@
     btn.addEventListener('pointerdown', armSwitch);
     // Keyboard (Enter/Space) produces a click with no pointerdown — cover it too.
     btn.addEventListener('click', armSwitch);
+
+    // ── TELL THE BOOK WHEN THE GAME ENDS ─────────────────────────────────────
+    // Hosted in the flipbook, this game is a page. When the win overlay comes up
+    // the reader has finished, so the book is told and answers by playing its
+    // page-turn cue and letting the page be dragged.
+    // Watched from out here — `#win-overlay` becoming visible IS the finale —
+    // so game.js is untouched. This game never leaves that screen ("nothing
+    // navigates away and there is no replay button"), so there is no restart to
+    // report, unlike LBD 1.
+    if (window.parent !== window) {
+      var win = document.getElementById('win-overlay');
+      if (win) {
+        var told = false;
+        var check = function () {
+          if (told) return;
+          var cs = getComputedStyle(win);
+          if (cs.visibility === 'hidden' || +cs.opacity < 0.5) return;
+          told = true;
+          try { window.parent.postMessage({ source: 'lbd', type: 'end' }, '*'); } catch (e) {}
+        };
+        // GSAP animates inline style, so attribute mutations catch it; the poll is
+        // the belt to that braces in case a future change tweens a class instead.
+        new MutationObserver(check).observe(win, { attributes: true, attributeFilter: ['style', 'class'] });
+        var poll = setInterval(function () { check(); if (told) clearInterval(poll); }, 400);
+      }
+    }
   })();
   </script>
 </body>

@@ -4821,12 +4821,50 @@ initRound();
     var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
     var already = document.fullscreenElement || document.webkitFullscreenElement;
     if (go && !already) {
+      // Ask the book to paint the same pink over the WHOLE screen first, and WAIT
+      // for it to say the paint has landed. The wipe only covers this frame; the
+      // frame growing from a page-sized box to the screen is plainly visible
+      // around it unless everything else is already the same colour.
+      // The handshake matters: posting and switching in the same breath left the
+      // mask ~15ms — under one frame — so it was never actually on screen.
+      switchWhenMasked(el, go);
+    }
+    leaveTitle();                       // idempotent: guards on titleDone
+  }
+
+  // Ask → wait for "masked" → switch. Falls back to switching anyway if the book
+  // does not answer (standalone, or a future host that does not know the protocol),
+  // so fullscreen is never lost waiting for an ack that is not coming.
+  function switchWhenMasked(el, go) {
+    var went = false;
+    function go2() {
+      if (went) return;
+      went = true;
+      // The wipe's splat is sized to the CURRENT viewport. Going fullscreen makes
+      // the viewport bigger, so the splat no longer reaches the new corners and
+      // the page background shows through there — measured as 19,8,34 (this
+      // game's dark purple) right after the switch, which is precisely what made
+      // the change visible. Painting the page itself the same pink for the
+      // duration of the wipe means the corners are pink too, so there is nothing
+      // to notice. It sits BEHIND everything, so the drain still reveals the
+      // scene normally; it is cleared once the wipe has finished.
+      var prev = el.style.background;
+      el.style.background = '#F77ADE';
+      setTimeout(function () { el.style.background = prev; },
+                 (typeof TRANS === 'object' && TRANS && TRANS.CLEANUP) ? TRANS.CLEANUP : 2300);
       try {
         var p = go.call(el, { navigationUI: 'hide' });
         if (p && p.catch) p.catch(function () {});   // refused → carry on windowed
       } catch (e) {}
     }
-    leaveTitle();                       // idempotent: guards on titleDone
+    if (window.parent === window) { go2(); return; }   // not framed → nothing to mask
+    window.addEventListener('message', function onMsg(ev) {
+      if (!ev.data || ev.data.source !== 'book' || ev.data.type !== 'masked') return;
+      window.removeEventListener('message', onMsg);
+      go2();
+    });
+    try { window.parent.postMessage({ source: 'lbd', type: 'covered' }, '*'); } catch (e) {}
+    setTimeout(go2, 250);                              // no ack → go regardless
   }
 
   btn.addEventListener('click', function () {
@@ -4836,6 +4874,31 @@ initRound();
     playSplashTransition();
     setTimeout(start, COVERED);
   });
+
+  // ── TELL THE BOOK WHEN THE GAME ENDS ────────────────────────────────────────
+  // Hosted in the flipbook, this game is a page. Once the celebration is up the
+  // reader has finished and should be invited to turn on — so the book is told,
+  // and it answers by playing its page-turn cue and letting the page be dragged.
+  // Watched from OUT HERE rather than wired into the game's own code: `#gameEnd`
+  // gaining `.show` IS the end screen appearing, and losing it is restartGame()
+  // going back to the title. Nothing in the game's logic is touched.
+  // The book must let go again on that restart, or the reader could never press
+  // Play a second time.
+  if (window.parent !== window) {
+    var endEl = document.getElementById('gameEnd');
+    if (endEl) {
+      var wasShown = false;
+      var tell = function (type) {
+        try { window.parent.postMessage({ source: 'lbd', type: type }, '*'); } catch (e) {}
+      };
+      new MutationObserver(function () {
+        var shown = endEl.classList.contains('show');
+        if (shown === wasShown) return;
+        wasShown = shown;
+        tell(shown ? 'end' : 'restart');
+      }).observe(endEl, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
 })();
 </script>
 </body>

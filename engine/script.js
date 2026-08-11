@@ -119,6 +119,14 @@ function makeMedia(page) {
     // clip restarting under the reader's finger reads as a bug. So a clip that has
     // ended is left alone, and one already playing with sound is left alone too.
     media.addEventListener("click", function () {
+      // Only ever the CURRENT page's clip. This handler used to rely on clicks
+      // simply never reaching another page's video, which stopped being a safe
+      // assumption once a finished GAME page dropped its iframe out of
+      // hit-testing and let taps fall through to the leaf beneath. Recovering
+      // sound only ever makes sense for the page being read, and starting a clip
+      // the reader has not reached would break the one-video-at-a-time rule. The
+      // `ended` handler below already guards this way.
+      if (!leaves[flipped] || !leaves[flipped].contains(media)) return;
       // A clip that has FINISHED is left alone — unless it played silently, in
       // which case the reader never heard the page and replaying it aloud is
       // exactly what they want.
@@ -1572,6 +1580,80 @@ function playScenes(idx, startDelay) {
   })(0, startDelay || 0);
 }
 
+/* ---- A GAME reporting in ------------------------------------------------
+   The games are separate documents, so the only way they can tell the book
+   anything is postMessage. Each posts { source:"lbd", type:"end" } when its end
+   screen appears, and LBD 1 posts "restart" when it loops back to its title.
+   On "end" the book does two things:
+     • plays its page-turn cue (dialogueDone → arrow glow + hand + ghost peel,
+       all on one beat), which it had been holding back while the game was played
+     • drops the frame out of hit-testing, so the page can be DRAGGED to turn like
+       any other. Only safe because both end screens are non-interactive (an
+       image, a video and confetti — no buttons); LBD 1's own restart puts the
+       frame back, or the reader could never press Play a second time.
+   `e.source` is matched against each frame's contentWindow rather than trusting
+   the origin: on file:// every document is an opaque origin, so origin checks
+   cannot identify the sender, but window identity can. */
+const gameDone = {};
+let lbdMask = null, lbdMaskTimer = null;
+function clearLbdMask() {
+  clearTimeout(lbdMaskTimer);
+  if (!lbdMask) return;
+  const m = lbdMask;
+  m.classList.add("clearing");
+  setTimeout(function () { if (m.parentNode) m.parentNode.removeChild(m); }, 320);
+  lbdMask = null;
+}
+window.addEventListener("message", function (e) {
+  const d = e.data;
+  if (!d || d.source !== "lbd") return;
+  let idx = -1, frame = null;
+  leaves.forEach(function (leaf, i) {
+    const fr = leaf.querySelector("iframe.page-game");
+    if (fr && fr.contentWindow === e.source) { idx = i; frame = fr; }
+  });
+  if (idx < 0) return;                         // not from a game we are hosting
+  if (d.type === "covered") {
+    // The game's wipe has the frame fully pink and is about to ask for
+    // fullscreen. Paint the same pink over the WHOLE screen so the switch has
+    // nothing to reveal: the frame growing to fill the screen is invisible when
+    // everything around it is already the same colour. Cleared once the switch
+    // has settled — by then the fullscreen game is drawn on top, so the fade is
+    // never seen either.
+    if (!lbdMask) {
+      lbdMask = document.createElement("div");
+      lbdMask.className = "lbd-mask";
+      lbdMask.setAttribute("aria-hidden", "true");
+      document.body.appendChild(lbdMask);
+    }
+    lbdMask.classList.remove("clearing");
+    clearTimeout(lbdMaskTimer);
+    // Long enough to outlast the browser's own fullscreen animation, short enough
+    // that a refused switch does not leave a pink screen sitting there.
+    lbdMaskTimer = setTimeout(clearLbdMask, 1100);
+    // ACK, and only after the mask has actually PAINTED. The game waits for this
+    // before switching. Without the handshake it posted `covered` and switched in
+    // the same breath, giving the mask ~15ms — less than a frame in practice, so
+    // it was never on screen when the switch happened and did nothing at all.
+    // Two rAFs: the first runs before the paint that includes the mask, the second
+    // after it.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        try { e.source.postMessage({ source: "book", type: "masked" }, "*"); } catch (_) {}
+      });
+    });
+    return;
+  }
+  if (d.type === "end") {
+    gameDone[idx] = true;
+    if (frame) frame.classList.add("done");    // .done drops pointer-events (CSS)
+    if (idx === flipped) dialogueDone(idx);    // → the turn cue, now it is welcome
+  } else if (d.type === "restart") {
+    gameDone[idx] = false;
+    if (frame) frame.classList.remove("done"); // the game is playable again
+  }
+});
+
 /* ---- The turn cue on a VIDEO page ---------------------------------------
    A video page's narration is baked into the clip, so the "you may turn now"
    cue (corner arrow + hand nudge) waits for the clip to FINISH — otherwise the
@@ -1648,6 +1730,9 @@ function refreshMedia() {
       if (fr.getAttribute("src") !== fr.dataset.src) fr.setAttribute("src", fr.dataset.src);
     } else if (fr.getAttribute("src") && fr.getAttribute("src") !== "about:blank") {
       fr.setAttribute("src", "about:blank");
+      // a fresh visit is a fresh game: it is reloaded, so it has not ended yet
+      gameDone[i] = false;
+      fr.classList.remove("done");
     }
   });
   duckMusic(onGame);
@@ -2583,12 +2668,14 @@ function dialogueDone(idx) {
 }
 
 function canShowHint() {
-  // Never on a GAME page. Pointer events inside its iframe do not reach this
-  // document, so the idle timer never gets reset while the reader is playing —
-  // the nudge would fire over the game and the ghost peel would lift the very
-  // page they are using. The corner arrow is armed from the moment a game page
-  // lands, so the way out is always visible without a nudge.
-  if (pages[flipped] && pages[flipped].type === "game") return false;
+  // On a GAME page, only once the game has ENDED. While it is being played,
+  // pointer events inside the iframe never reach this document, so the idle timer
+  // is never reset and the nudge would fire over the game — the ghost peel lifting
+  // the very page in use. The corner arrow is available throughout regardless, so
+  // nobody is trapped; the cue is held back until the game says it is finished
+  // (see the `lbd` message handler), which is exactly when the invitation to turn
+  // on is welcome rather than an interruption.
+  if (pages[flipped] && pages[flipped].type === "game" && !gameDone[flipped]) return false;
   return opened && ready && !animating &&
          hintDoneFor === flipped &&          // never before the scene completes
          flipped < totalPages - 1 && !document.hidden;

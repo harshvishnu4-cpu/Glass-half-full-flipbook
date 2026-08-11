@@ -1015,6 +1015,31 @@
        whole reason it is an iframe and not inlined script */
     pointer-events: auto;
   }
+  /* MASK FOR THE FULLSCREEN SWITCH.
+     Hiding the switch inside the game's own wipe was not enough, because the wipe
+     only covers the IFRAME. At the moment fullscreen engages, the frame stops
+     being a page-sized rectangle and becomes the whole screen, so the desk, the
+     book and the arrows all vanish at once — that jump is what stayed visible.
+     A transition is unnoticeable when the before and after states match, so the
+     book paints the WHOLE screen in the same pink the game's splat is showing
+     (#F77ADE — the fill in both games' splash art and their drain waves). Then:
+     pink everywhere → switch → pink everywhere.
+     No transition on the way IN, deliberately: it appears while the frame is
+     already fully pink, so there is nothing to ease. It fades out afterwards,
+     behind the fullscreen game, so removing it is never seen either. */
+  .lbd-mask {
+    position: fixed; inset: 0; z-index: 9998;
+    background: #F77ADE;
+    pointer-events: none;
+    opacity: 1;
+  }
+  .lbd-mask.clearing { opacity: 0; transition: opacity 260ms linear; }
+  /* …until the game reports that it has ENDED (see the `lbd` message handler).
+     Its end screen has nothing to tap, so handing gestures back to the book lets
+     the reader DRAG the page to turn on, exactly as on every other page, instead
+     of the corner arrow being the only way out. LBD 1 takes this back when it
+     loops to its own title screen. */
+  .page-game.done { pointer-events: none; }
   /* SCENES — one page can hold several storyboard screens stacked full-bleed.
      script.js cross-DISSOLVES between them (LXD rule: 1.1s — keep in sync with
      DISSOLVE_MS there) and pops each scene's bubble in as its scene appears. */

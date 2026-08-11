@@ -13,7 +13,131 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the fullscreen switch is now HIDDEN INSIDE the wipe
+## 2026-08-11 (latest) — the fullscreen switch: pink before, pink after
+
+Author: still noticeable, make it unnoticeable. It was — and hiding it inside the
+game's wipe was never going to be enough, for a reason that only showed up under
+measurement.
+
+**A wipe inside the iframe only covers the iframe.** At the instant fullscreen
+engages, that frame stops being a page-sized rectangle and becomes the whole
+screen, so the desk, the book and the arrows all disappear at once. And it is worse
+on the far side: the wipe's splat is sized to the **pre-switch** viewport, so once
+the viewport grows it no longer reaches the new corners and the game's own dark
+background shows through — measured at **`19,8,34`** in the frames right after the
+switch. Neither state was uniform, so there was always something to see.
+
+A transition is unnoticeable when the before and after states MATCH. Both ends are
+now the same pink — `#F77ADE`, the fill in both games' splash art and their drain
+waves, so nothing was invented:
+
+- **Before** — the book paints `.lbd-mask`, a fixed full-screen div in that pink,
+  over everything including the desk and arrows.
+- **After** — each game paints its own page background the same pink for the wipe's
+  duration, so the enlarged viewport's corners are pink too. It sits behind
+  everything, so the drain still reveals the scene normally, and it is cleared when
+  the wipe finishes.
+
+### The handshake, which is what actually made the mask work
+
+The first attempt posted `covered` and requested fullscreen in the same breath. Since
+postMessage is async, that gave the mask **~15ms — under one frame** — so it was
+never on screen when the switch happened and did nothing at all. The measurement said
+so plainly: *zero* frames with all four corners pink.
+
+Now the game asks and **waits**: `covered` → the book paints, waits two rAFs so the
+paint has actually landed, and replies `masked` → only then does the game switch. With
+a 250ms fallback so a host that does not speak the protocol (or standalone) still goes
+fullscreen.
+
+Result, sampling a screen recording every 30ms at all four corners:
+
+| | all-four-corners-pink frames |
+|---|---|
+| before the handshake | **0** |
+| handshake only | 1 (~30ms) |
+| handshake + pink page background | **4 (~120ms)** |
+
+And "frames with ANY pink corner" spans exactly the same range as "all four" — so
+there is no half-masked frame on either side. The switch happens inside a window
+where the whole screen is one flat colour.
+
+### Two measurement traps on the way
+
+- `page.screenshot()` is ~380ms per frame, far too coarse for a switch lasting a
+  couple of frames; it reported no pink at all. A screen recording sampled at 30ms
+  found it. (Same lesson as the load-glitch hunt.)
+- The recording sampler had to run on the **file origin** — an `http://` page cannot
+  read a `file://` video, which failed as "no read" until the helper page moved.
+
+Verified after: both games still start where fullscreen is refused (book on
+`file://` — LBD 1 at 791ms, LBD 2 at 1182ms), the end-of-game handoff still works
+(cue plays, drag turns the page 8 → 9, restart hands gestures back), 10/10 on the
+game-integration checks, no host errors, read-through clean.
+
+---
+
+## 2026-08-11 — a finished game hands the page back to the book
+
+Author: after the game ends, the end screen shows and the reader should be able to
+turn the page with the flip animation. Two things were in the way: the book had no
+idea a game had finished, and **drag-to-flip could not work on a game page at all**
+— the iframe swallows pointer events, which is the very isolation that stops the
+book stealing the game's drags.
+
+### The games now report in
+
+Each posts `{ source: "lbd", type: "end" }` to the parent when its end screen
+appears — and, for LBD 1, `"restart"` when it loops back to its title.
+
+Neither game's own logic was touched. Both moments are observable from the appended
+script instead:
+
+- **LBD 1** — `#gameEnd` gaining `.show` *is* the end screen; losing it is
+  `restartGame()`.
+- **LBD 2** — `#win-overlay` becoming visible *is* the finale. It never leaves that
+  screen ("nothing navigates away and there is no replay button"), so it has no
+  restart to report. A MutationObserver catches GSAP's inline-style change, with a
+  slow poll as the belt to that braces.
+
+### What the book does with it
+
+`dialogueDone(idx)` → the page-turn cue it had been **holding back**: arrow glow,
+hand and ghost peel, together on one beat. `canShowHint` used to veto game pages
+outright; it now vetoes only until `gameDone[idx]`, so the nudge cannot interrupt
+play but arrives the moment it is welcome. The arrow stays available throughout
+regardless, so an unfinished game never traps anyone.
+
+And **`.page-game.done { pointer-events: none }`** — the frame drops out of
+hit-testing, so the page can be dragged to turn like any other. Only safe because
+both end screens are non-interactive (an image, a video, confetti — no buttons),
+checked before relying on it. LBD 1's `restart` message puts the frame back, or the
+reader could never press Play a second time.
+
+`e.source` is matched against each frame's `contentWindow` rather than trusting the
+origin: on `file://` every document is an opaque origin, so origin checks cannot
+identify a sender, but window identity can.
+
+Verified: mid-game the frame still owns gestures and no nudge fires; on the end
+screen the book flips to `done`, `pointer-events: none`, the cue plays, and **a real
+drag turns the page 8 → 9**; on restart gestures go back to the game.
+
+### A latent bug the change exposed
+
+Letting taps fall through meant they could now reach the leaf beneath — and the
+video click handler (the "tap for sound" recovery) had **no check that the video
+belongs to the current page**. It would have called `play()` on whatever video was
+clicked, breaking the one-video-at-a-time rule. I could not get it to fire — taps at
+both the centre and the right edge land on the game leaf's own `DIV.face front`, and
+0 videos played — but the handler was relying on an assumption my change had just
+invalidated, and its sibling `ended` handler already guards exactly this way. Added
+the guard rather than leaving it to luck.
+
+Read-through clean, still "max videos playing at once: 1".
+
+---
+
+## 2026-08-11 — the fullscreen switch is now HIDDEN INSIDE the wipe
 
 Author: the fullscreen switch still looks bad — it should happen *in between* the
 splash transition. Right, and better than what came before it: the previous fix put
