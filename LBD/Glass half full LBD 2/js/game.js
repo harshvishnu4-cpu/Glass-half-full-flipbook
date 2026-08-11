@@ -609,9 +609,17 @@
       onComplete: function () { gsap.set(qbar, { visibility: 'hidden' }); } });
   }
 
+  /* Bumped whenever the tutorial is called off (the player dived in and started
+     sorting). Lines are chained on each other's completion rather than on fixed
+     delays, and an onDone that has already been handed to showTutMascot cannot be
+     killed like a timer can — so each chained step captures this and bails if it
+     has moved on. */
+  var tutSeq = 0;
+
   function clearTutTimers() {
     state.tutTimers.forEach(function (t) { t.kill(); });
     state.tutTimers = [];
+    tutSeq++;
   }
 
   /* glowing-tray hints (also used after three wrong attempts in a row) */
@@ -797,9 +805,14 @@
   function phase2Intro() {
     SFX.play('win');
     confettiBurst(50);
-    showTutMascot(TUT[3]); /* Agni: "Great job! Now let us serve our customers." */
-    gsap.delayedCall(4.6, function () { hideTutMascot(); }); /* the spoken line runs ~4.6s in */
-    gsap.delayedCall(5.0, transitionToPhase2);
+    /* Agni: "Great job! Now let us serve our customers." — the dismissal and the
+       scene swap follow the line ACTUALLY finishing (onDone = fully typed and
+       spoken). The old pair of guesses, 4.6s and 5.0s, cleared the measured 3.82s
+       clip by only 130ms, so a slow frame left him talking to an empty bubble. */
+    showTutMascot(TUT[3], function () {
+      hideTutMascot();
+      gsap.delayedCall(0.4, transitionToPhase2);   // same beat as the old 4.6→5.0
+    });
   }
 
   function transitionToPhase2() {
@@ -1213,12 +1226,18 @@
       clearTutTimers(); /* cancel the intro bubble's pending hide — the cheer owns Agni now */
       gsap.delayedCall(0.35, centerServingTrays);
       gsap.delayedCall(1.1, function () {
-        showTutMascot(TUT[5]); /* "Awesome! You are ready to serve everyone." */
-      });
-      gsap.delayedCall(5.6, function () { hideTutMascot(); }); /* the spoken cheer runs ~5.6s in */
-      gsap.delayedCall(6.0, function () {
-        state.locked = false;
-        startServing();   /* the first three customers file in from the right */
+        /* "Awesome! You are ready to serve everyone." — dismissed when the line
+           has actually finished. This was the worst of the guessed timers: the
+           clip is 3.82s and starts 1.1s + 0.65s in, ending at 5.57s, against a
+           hide at 5.6s — a 30ms margin, so it was a coin flip whether Agni was
+           cut off talking to an empty bubble. */
+        showTutMascot(TUT[5], function () {
+          hideTutMascot();
+          gsap.delayedCall(0.4, function () {      // same beat as the old 5.6→6.0
+            state.locked = false;
+            startServing(); /* the first three customers file in from the right */
+          });
+        });
       });
     }
   }
@@ -1517,15 +1536,15 @@
     /* Agni speaks every line, then steps aside for the hands-on step (all
        skipped if the player just dives in and drops a glass). The first line
        waits ~1.5s so the scene has settled before the bar drops in. */
-    tutLater(1.5, function () { showTutMascot(TUT[0]); });
-    tutLater(5.4, function () {
-      /* "Let us sort the glasses into trays" — all three trays light up so the
-         player sees the three destinations before any one of them is singled
-         out (and well before the ghost demo starts) */
-      showTutMascot(TUT[1]);
-      hintZone('empty'); hintZone('half'); hintZone('full');
-    });
-    tutLater(8.8, function () {
+    /* Each line waits for the PREVIOUS one to actually finish — onDone fires only
+       once a line is fully typed AND spoken. The old fixed schedule (1.5s / 5.4s /
+       8.8s) cleared the measured clips by just 130ms and 250ms, so on a slower
+       device, or with a clip that decoded a shade longer, the next line started
+       while Agni was still talking: the bubble retyped mid-sentence under the old
+       audio. Chaining costs about 0.2s over the whole intro and cannot race. */
+    var seq = tutSeq;
+    var line3 = function () {
+      if (seq !== tutSeq) return;              // the player dived in — tutorial off
       /* narrow from all three to the one he is about to name: the glass lights
          up as Agni says "This glass is empty", and the tray only joins in when
          he says where to put it */
@@ -1541,6 +1560,17 @@
       }, [
         { at: TUT[2].indexOf('Put it'), fn: function () { hintZone('empty'); } }
       ]);
+    };
+    var line2 = function () {
+      if (seq !== tutSeq) return;
+      /* "Let us sort the glasses into trays" — all three trays light up so the
+         player sees the three destinations before any one of them is singled
+         out (and well before the ghost demo starts) */
+      showTutMascot(TUT[1], function () { tutLater(0.3, line3); });
+      hintZone('empty'); hintZone('half'); hintZone('full');
+    };
+    tutLater(1.5, function () {
+      showTutMascot(TUT[0], function () { tutLater(0.3, line2); });
     });
   }
 

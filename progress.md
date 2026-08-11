@@ -13,7 +13,95 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — a finished game gives the book back
+## 2026-08-12 (latest) — a bug sweep across the book and both games
+
+Two real bugs found and fixed. The reported one — LBD 2 playing a line's audio with
+no dialogue on screen — **could not be reproduced**, and that is recorded honestly
+below rather than papered over.
+
+### Fixed: LBD 1 404'd a voice clip on every single load
+
+`TITLE_MUSIC_SRC = 'audio/ready set serve.ogg'` — the spoken title announcement.
+The file is not in `audio/`, has no `.m4a` twin, and **has never existed in this
+project's git history**, so the reference could only ever 404. It was also listed
+in the preload manifest at 28,677 bytes, so the loader was told to fetch bytes that
+could not arrive.
+
+Set to `''` (every use already guards on it, so `titleMusic` stays null and the
+title is simply silent) and the manifest line commented out, both with restore
+instructions. The Play button already appeared at 836ms, so this was never gating
+loading — it was pure console noise plus a missing announcement.
+
+**To restore:** drop the clip into `LBD/Glass half full LBD 1/audio/` and put the
+filename back in both places.
+
+### Fixed: LBD 2's dialogue was chained on guessed timers
+
+Agni's lines were sequenced and dismissed by hard-coded delays, each one a guess at
+its clip's length. Measured against the real clips (via `SFX.voiceDuration` after
+preload, **not** raw `<audio>` over my test server — that reports `Infinity` because
+the server has no Range support):
+
+| line | clip | audio ends | next event | margin |
+| --- | --- | --- | --- | --- |
+| TUT[0] | 3.12s | 5.27s | next line at 5.4s | **130ms** |
+| TUT[1] | 2.95s | 8.55s | next line at 8.8s | **250ms** |
+| TUT[3] | 3.82s | 4.47s | hide at 4.6s | **130ms** |
+| TUT[5] | 3.82s | 5.57s | hide at 5.6s | **30ms** |
+
+A negative margin means either the next line starts while Agni is still talking
+(the bubble retypes mid-sentence under the old audio) or the bubble leaves while
+the clip runs on — **audio with no dialogue**. The 30ms one is a coin flip.
+
+The code already had the right mechanism and was using it in one place: the `onDone`
+callback passed to `showTutMascot` fires only once a line is **fully typed AND
+spoken**. All four sites now use it. Gaps measured after: 677ms and 752ms, up from
+304ms and 395ms. Added a `tutSeq` token bumped by `clearTutTimers`, because an
+`onDone` already handed to `showTutMascot` cannot be killed like a timer can — so a
+chained line still checks whether the player dived in and the tutorial was called off.
+
+LBD 1 already does this correctly (`clip.onended = advance`, with a safety net sized
+from the real duration), so this only brings LBD 2 into line with it.
+
+### Could NOT reproduce: LBD 2 audio with no dialogue
+
+Driven every path I can reach, watching `#agni`'s computed visibility and the bubble
+against every clip that starts. In all of them the bubble stayed up for the whole
+clip and the text typed out in full:
+
+- standalone over HTTP, and standalone on `file://`
+- inside the book (where it also goes fullscreen and the stage rescales mid-tutorial)
+- the wrong-drop nudge (`wrongStreak >= 2`), where the bubble deliberately shows
+  only "This glass is half full." while the clip also says "Put it in the correct tray."
+- a full playthrough to the serving phase: all 7 clips, none cut short
+- **with the CPU throttled 6×**, and the pre-fix code throttled 3× all the way to
+  the 30ms-margin line — even that held here
+
+So the timer fix above is a robustness fix, not a proven cure. If the symptom is
+still there, what would pin it down: which line, and whether it is on `file://` or
+the hosted build.
+
+### Checked, not bugs
+
+- **LBD 2's garnish boxes** (`#lemonbox`/`#strawbox`) — Playwright called them "not
+  visible" and a blocked garnish step would stall the game. In phase 2 they are
+  `visible`, opacity 1, `pointer-events: auto`, and `elementFromPoint` at their
+  centre returns the box itself. My harness was clicking before the phase transition.
+- **LBD 1 on Safari** — `VOICE` builds every path as `.ogg`, which looked like it
+  ignored the `.m4a` twins and the codec detection. It does not: `regAudio` routes
+  through `mediaSrc`, which swaps the extension. All 13 mapped lines have both twins
+  and there are no orphan clips.
+- **`assets/pages/Page N.mp4` in `requestfailed`** — the engine aborting in-flight
+  range requests as it unloads a video on leaving a page. Every file is present.
+- **"Allow attribute will take precedence over 'allowfullscreen'"** — the book's game
+  iframes carry both deliberately; `allowfullscreen` is the fallback for browsers
+  without `allow`. Harmless redundancy, left alone.
+
+Final state: **0 missing assets and 0 JS errors** across the book, LBD 1 and LBD 2.
+
+---
+
+## 2026-08-11 — a finished game gives the book back
 
 A game is played **fullscreen**, so when it ended the reader was left looking at a
 celebration filling the screen with the book nowhere in sight: no page to turn, no

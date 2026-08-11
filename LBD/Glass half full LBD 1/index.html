@@ -1460,7 +1460,10 @@ const ASSET_BYTES = {
   'audio/Let us serve him.ogg': 17734,
   'audio/Look! Our first customer.ogg': 27871,
   'audio/Now, it is your turn!.ogg': 24182,
-  'audio/ready set serve.ogg': 28677,
+  /* 'audio/ready set serve.ogg' was listed here but the file does not exist — not
+     in audio/, with no .m4a twin, and never in this project's git history. The
+     preloader was being told to fetch 28,677 bytes that could only 404. See
+     TITLE_MUSIC_SRC below: restore both lines together if the clip is supplied. */
   'audio/Tap the Pour button 2 times.ogg': 31513,
   'audio/Tap the Pour button 4 times.ogg': 31650,
   'audio/Tap the button to pour juice.ogg': 26360,
@@ -1771,7 +1774,14 @@ transitionSound.volume = 0.7;
 // tap — the wrong moment, and the behaviour this replaced.
 // The trade-off is explicit: the title is announced wherever autoplay is allowed, and silent
 // where it is not, but the line can never arrive after the title has been left.
-const TITLE_MUSIC_SRC = 'audio/ready set serve.ogg';
+// EMPTY because the clip is missing, not because the sting was dropped: there is no
+// 'audio/ready set serve.ogg' in audio/, no .m4a twin, and no trace of it anywhere in
+// this project's git history — so the only thing the reference produced was a 404 on
+// every single load. Everything below already treats an empty src as "no sting" and
+// no-ops cleanly (titleMusic stays null), so the title is simply silent.
+// TO RESTORE: drop the clip into audio/ and put its filename back here, and re-add
+// its line to the preload manifest above.
+const TITLE_MUSIC_SRC = '';
 const TITLE_MUSIC_VOL = 0.85;
 // routed through regAudio so the boot preloader streams it and hands it a blob: URL
 const titleMusic = TITLE_MUSIC_SRC ? regAudio(TITLE_MUSIC_SRC) : null;
