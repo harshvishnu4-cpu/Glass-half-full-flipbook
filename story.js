@@ -72,8 +72,18 @@ window.STORY = {
   //   playAt     : where it sits, as a % of the cover. Put it over a calm part of
   //                your cover art — here the cauldron's black belly, clear of the
   //                title, both characters and the bubbling juice.
+  //   playSound  : the click it makes (any file in sfx/). Remove it and the engine
+  //                falls back to its own synthesized pop, so the press is never
+  //                silent.
+  //   playSoundSkip : seconds of leading silence to skip. This recording has 100ms
+  //                before the transient (measured); starting at 0 makes the button
+  //                feel 100ms late.
+  //   playSoundVolume : 0–1, default 0.4. The file is normalised to peak 1.0, and
+  //                0.4 matches the weight of the cover-flip sound beside it.
   playButton: "assets/play button.svg",
   playAt: { x: "50%", y: "77%" },
+  playSound: "sfx/play click (1).mp3",
+  playSoundSkip: 0.1,
 
   // The pointing hand for the cues that point INTO a page's illustration — the
   // "tap the screen" cue and the POUR hint. Remove this line and they fall back

@@ -1870,7 +1870,9 @@ function runOpenSequence() {
   // rather than on the button's click handler so every route in gets it — the
   // button, a tap on the catcher inside the hit-circle, and Enter/Space on the
   // focused button all arrive through openBook().
-  playPopSfx({ from: 660, to: 210, gain: 0.4 });
+  // The story's `playSound` file if it has one, else the synthesized pop — so the
+  // press is never silent, whichever the story provides.
+  if (!playPlaySfx()) playPopSfx({ from: 660, to: 210, gain: 0.4 });
   playCoverFlip();
   playBgMusic();                        // start the looping background music
   primeVideo(flipped); primeVideo(flipped + 1);   // unlock the landing page + next inside the gesture
@@ -2440,6 +2442,32 @@ function playSfx(name, vol, rate) {
    a caller shift its character without touching those: the Play button uses a
    brighter, slightly quieter 660→210Hz so a button press doesn't sound like a
    sticker landing, and doesn't bury the cover swoosh that follows it. */
+/* The PLAY BUTTON's click, from the story's own file (`playSound`). An <audio>
+   element, not the Web Audio path: that one reads from the base64 in
+   engine/sfx-data.js, and this is a story-owned sound, not an engine one.
+   `playSoundSkip` exists because a recorded click usually has a little silence
+   before the transient — this file has 100ms of it, measured — and starting at 0
+   would make the button feel 100ms late however fast the code is. Seeking a
+   short, preloaded file is instant. */
+const playSound = STORY.playSound ? new Audio(encodeURI(STORY.playSound)) : null;
+const PLAY_SFX_SKIP = (STORY.playSoundSkip != null) ? STORY.playSoundSkip : 0;
+if (playSound) {
+  playSound.preload = "auto";
+  // measured against cover page flip.mp3 (peak 0.46 played at 0.35): this file is
+  // normalised to peak 1.0, so 0.4 lands it at the same perceived weight as the
+  // synthesized pop it replaces rather than startling a small child.
+  playSound.volume = (STORY.playSoundVolume != null) ? STORY.playSoundVolume : 0.4;
+}
+function playPlaySfx() {
+  if (muted || !playSound) return false;
+  try {
+    playSound.currentTime = PLAY_SFX_SKIP;     // start on the transient, not the silence
+    const p = playSound.play();
+    if (p && p.catch) p.catch(function () { playPopSfx({ from: 660, to: 210, gain: 0.4 }); });
+    return true;
+  } catch (_) { return false; }
+}
+
 function playPopSfx(opts) {
   if (!audioCtx || muted) return;
   const o0 = (opts && opts.from) || 520;

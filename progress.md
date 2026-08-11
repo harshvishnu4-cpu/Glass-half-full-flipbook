@@ -13,7 +13,54 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the background music is gone
+## 2026-08-11 (latest) — the Play button has a real click sound
+
+Author added `sfx/play click (1).mp3`. It now plays when the Play button is tapped,
+replacing the synthesized pop that stood in for it.
+
+Wired as a **story option**, next to the button it belongs to, so `engine/` stays
+story-agnostic like `playButton` / `playAt`:
+
+    playSound: "sfx/play click (1).mp3",
+    playSoundSkip: 0.1,
+
+Fired from inside `openBook()`, not the button's own handler, so **every route in
+gets it** — the button, a tap on the catcher inside the hit-circle, and Enter/Space
+on the focused button. Verified the catcher route too, not just the obvious one.
+
+### Two things measurement decided, rather than taste
+
+- **`playSoundSkip: 0.1`.** The recording has **100ms of silence before its
+  transient** (measured). Played from 0 the button would feel 100ms late however
+  fast the code is — the same problem the engine's Web Audio path already solves
+  with a per-sound `offset`. Verified it now starts at `currentTime 0.1` and runs
+  on to 0.98s, so it is really sounding rather than stalled.
+- **Volume 0.4.** The file is normalised to **peak 1.0**, where the cover-flip
+  beside it is peak 0.46 played at 0.35 — an effective 0.16. At full volume this
+  would have been roughly six times its neighbour. 0.4 matches the perceived weight
+  of the synthesized pop it replaces, which was rendered peak 0.39.
+
+An `<audio>` element rather than the engine's Web Audio path on purpose: that one
+reads from the base64 in `engine/sfx-data.js`, which is for engine sounds, and this
+is the story's.
+
+**The pop is now the fallback, not dead code.** If the file cannot play the
+`play()` rejection fires it, so the press is never silent. Tested by aborting the
+request: the pop fired (1 oscillator) and the book still opened. When the file does
+play, the pop does **not** double up — verified 0 oscillators.
+
+All of this under the **real autoplay policy** (no `--autoplay-policy` override),
+because the click is the first sound of the session and overriding the policy is
+exactly what hides that class of failure.
+
+Read-through clean; 28 asset references resolve case-exact.
+
+Minor: the filename still carries a browser's download suffix — `play click (1).mp3`.
+Renaming it means one matching edit to `playSound` in story.js.
+
+---
+
+## 2026-08-11 — the background music is gone
 
 Author: remove the background music. Read as the BOOK's `music:` track — the thing
 story.js and the engine both call "background music" (`bgMusic`, `playBgMusic`) —
