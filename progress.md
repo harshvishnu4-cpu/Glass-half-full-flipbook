@@ -100,6 +100,22 @@ HTTP, and the fullscreen path only exists there — confirmed
   disk. The one genuine miss is LBD 1's own `audio/ready set serve.ogg`,
   pre-existing and its own bug.
 
+### Also swept into this commit: a replaced `Page 10.mp4`
+
+`assets/pages/Page 10.mp4` changed on disk during the session (8,918,176 →
+8,845,579 bytes) without my touching it, so it went in with the above. Checked it
+the way every other replaced export has been checked, because page 10 is the one
+carrying the **iris** (`iris: { at: 12600, … }`) and a re-edit would move the zoom
+out from under it:
+
+- duration **15.022s** and **1920×1080** — identical to the previous file;
+- frames sampled at 0.5 / 4 / 8 / 11 / **12.6** / 13.5 / 14.8s are **pixel-identical**
+  (mean abs diff 0.00 at every point), against controls of 46.26 and 33.32 for
+  frames that genuinely differ — so the 0.00s are real, not a broken comparison.
+
+It is a **re-mux**, not a re-encode: same frames, smaller container. Nothing to
+integrate, and the iris still fires on exactly the same frame.
+
 ---
 
 ## 2026-08-11 — the fullscreen switch: pink before, pink after
