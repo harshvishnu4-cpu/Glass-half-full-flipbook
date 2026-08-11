@@ -83,8 +83,10 @@ window.STORY = {
   // than the story happening inside it.
   handNudge: "assets/pages/hand nudge.webp",
 
-  // Looping background music (any file in sfx/). Remove this line for silence.
-  music: "sfx/BG Music.mp3",
+  // Looping background music (any file in sfx/). Removed at the author's request,
+  // so the book is silent apart from each page's own narration and the SFX. Put a
+  // line like this back to restore it:
+  //   music: "sfx/BG Music.mp3",
 
   /* ── THE BOOK ────────────────────────────────────────────────────────────
      Each clip in assets/pages/ is one finished page: the art, the animation

@@ -13,7 +13,47 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — tapping Play in a game takes it FULLSCREEN
+## 2026-08-11 (latest) — the background music is gone
+
+Author: remove the background music. Read as the BOOK's `music:` track — the thing
+story.js and the engine both call "background music" (`bgMusic`, `playBgMusic`) —
+not the games' own audio, which is untouched. It is also the file that vanished from
+the working tree three times while `story.js` still pointed at it, which now reads
+as the author having wanted it gone all along.
+
+- `story.js`'s `music:` line removed (kept as a commented one-liner to restore it).
+- `sfx/BG Music.mp3` deleted — 9.35MB, tracked, so recoverable from git. Deployable
+  payload: **86MB → 78MB**.
+
+### A latent trap the removal would have sprung
+
+`bgMusic` was built unconditionally:
+
+    const bgMusic = new Audio(STORY.music ? encodeURI(STORY.music) : "");
+
+An **empty src resolves to the document's own URL**, so a deliberately silent book
+would have had the browser fetch `index.html` and try to decode the HTML as audio —
+a media error and a junk request on every load. It never showed while `music:` was
+set, and would have appeared the moment it wasn't. `bgMusic` is now `null` when
+there is no music, with all five uses guarded (`playBgMusic`, `duckMusic`,
+`closeBookToCover`, and the two visibility-change handlers). `duckMusic` also now
+guards on `bgMusic` rather than `STORY.music`, so the two can never disagree.
+
+Verified with a silent book: **no music element created, nothing requests
+index.html as audio, no failed requests, no page errors** — and every other sound
+still present (`Page flip`, `cover page flip`, `pour.wav`, `glass-full.wav`, the
+pour prompt). Page turns, which call `duckMusic` on every arrival and on the game
+pages, throw nothing. The pour page's own narration and sticker pops are unchanged
+(`660→210@0.4` for the button, `520→160@0.5` for the stickers). 27 asset references
+resolve case-exact; read-through reaches THE END with only game 1's own missing
+`ready set serve.ogg`.
+
+Note: the games keep their own soundtracks. `duckMusic` is still called when a game
+takes the page — now a no-op, harmless, and correct again the moment music returns.
+
+---
+
+## 2026-08-11 — tapping Play in a game takes it FULLSCREEN
 
 Author: in the LBD games, tapping Play should open the game fullscreen. A book page
 is a small window for a game, especially a drag-and-drop one.

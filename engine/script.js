@@ -1949,7 +1949,7 @@ function resetToStart() {
   stopTurnCue();                               // no watchdog running behind the cover
   hideSoundHint(null);
   releaseWake();                               // closed book → the screen may sleep again
-  try { bgMusic.pause(); bgMusic.currentTime = 0; bgMusic.volume = BG_VOL; } catch (_) {}   // stop music, un-ducked for next Play
+  if (bgMusic) { try { bgMusic.pause(); bgMusic.currentTime = 0; bgMusic.volume = BG_VOL; } catch (_) {} }   // stop music, un-ducked for next Play
   updateProgress();                            // re-sync nav state (arrows greyed)
 }
 
@@ -2238,12 +2238,19 @@ let muted = true;
 // user gesture) so the browser allows it to play with sound.
 const BG_VOL   = 0.20;                        // music alone (cover, page turns, THE END)
 const DUCK_VOL = 0.06;                        // music under a page's narration
-const bgMusic = new Audio(STORY.music ? encodeURI(STORY.music) : "");
-bgMusic.loop = true;
-bgMusic.volume = BG_VOL;
-bgMusic.preload = "auto";
+// NULL when the story sets no music. It used to be `new Audio("")` in that case,
+// which is a trap: an empty src resolves to the DOCUMENT's own URL, so the browser
+// fetches index.html and tries to decode the HTML as audio — a media error and a
+// junk request on every load of a deliberately silent book. Every use below is
+// guarded instead.
+const bgMusic = STORY.music ? new Audio(encodeURI(STORY.music)) : null;
+if (bgMusic) {
+  bgMusic.loop = true;
+  bgMusic.volume = BG_VOL;
+  bgMusic.preload = "auto";
+}
 function playBgMusic() {
-  if (!STORY.music) return;                   // no music set → silent book
+  if (!bgMusic) return;                       // no music set → silent book
   try {
     const p = bgMusic.play();
     if (p && p.catch) p.catch(function () {});   // ignore autoplay rejections
@@ -2254,7 +2261,7 @@ function playBgMusic() {
    20% the music sat right under every voice-over, competing with it.) */
 let _duckTween = null;
 function duckMusic(on) {
-  if (!STORY.music) return;
+  if (!bgMusic) return;                       // silent book → nothing to duck
   const to = on ? DUCK_VOL : BG_VOL;
   if (G) {
     if (_duckTween) _duckTween.kill();
@@ -2339,7 +2346,7 @@ function currentVideo() {
   return leaf ? leaf.querySelector("video.page-media") : null;
 }
 function pauseAllAudioFB() {
-  if (!bgMusic.paused) { _bgWasPlaying = true; try { bgMusic.pause(); } catch (_) {} }
+  if (bgMusic && !bgMusic.paused) { _bgWasPlaying = true; try { bgMusic.pause(); } catch (_) {} }
   const v = currentVideo();
   if (v && !v.paused) { v.dataset.wasPlaying = "1"; try { v.pause(); } catch (_) {} }
   if (audioCtx && audioCtx.state === "running") { try { audioCtx.suspend(); } catch (_) {} }
