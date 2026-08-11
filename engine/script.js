@@ -1600,6 +1600,55 @@ const gameDone = {};
 // game from a working one — see the `game-missing` timer in refreshMedia.
 const gameReady = {};
 let gameReadyTimer = null;
+let gameEndTimer = null;
+
+/* A finished game hands the reader back to the BOOK.
+   The game is played fullscreen, so when it ends the reader is looking at a
+   celebration filling the screen with the book nowhere in sight — no page to
+   turn, no arrow, no hand, and no way onward except finding Esc. So leave
+   fullscreen first, and only then play the page-turn cue: the arrow and the hand
+   live in the book, and a cue nobody can see is a cue wasted.
+   Neither end screen loses anything by shrinking — LBD 1 freezes on its last
+   frame waiting for a tap, LBD 2 simply holds — so the frozen celebration stays
+   visible in the page as the reader turns on. */
+function returnFromGame(idx) {
+  clearTimeout(gameEndTimer);
+  const frame = leaves[idx] && leaves[idx].querySelector("iframe.page-game");
+  // Only NOW does the book take the page over: `gameDone` is what opens the turn
+  // cue's gate (see canShowHint) and `.done` is what stops the frame swallowing
+  // gestures. Doing either at `end` armed the cue behind a fullscreen celebration
+  // nobody could see past, and took the game's own taps away while its card was
+  // still up — LBD 1's end card waits for one to replay.
+  const handOver = function () {
+    gameDone[idx] = true;
+    if (frame) frame.classList.add("done");
+    if (idx === flipped) dialogueDone(idx);    // → arrow + hand, now they are visible
+  };
+  // Again, against the FRAME: the book is fullscreen for the whole reading, so a
+  // bare truthiness test would send `leave` even when the game never went
+  // fullscreen at all. Leaving the game's fullscreen restores the BOOK's, which is
+  // what puts the reader back in the full-screen book rather than a windowed one.
+  if (!frame || document.fullscreenElement !== frame) { handOver(); return; }
+  // Ask the GAME to leave fullscreen rather than calling exitFullscreen here. The
+  // game requested it on its own documentElement, so the element is inside the
+  // frame and only the frame's document can cleanly release it: exiting from this
+  // side shrank the frame but left `document.fullscreenElement` still pointing at
+  // the iframe — a half-exited state. The game answers `left` when it is done.
+  let settled = false;
+  const done = function () {
+    if (settled) return;
+    settled = true;
+    // Two frames, so the book is laid out at window size again before the cue
+    // animates: the hand and the ghost peel are positioned in % of the page, and
+    // starting them mid-resize puts them briefly in the wrong place.
+    requestAnimationFrame(function () { requestAnimationFrame(handOver); });
+  };
+  gameLeftHandler = done;
+  try { frame.contentWindow.postMessage({ source: "book", type: "leave" }, "*"); } catch (_) {}
+  clearTimeout(gameEndTimer);
+  gameEndTimer = setTimeout(done, 900);        // no answer → hand over anyway
+}
+let gameLeftHandler = null;
 // How long the pink mask takes to spread over the screen. Must match the
 // .lbd-mask.up transition in styles.css, and must fit inside the covered window
 // of the game's wipe (LBD 1: waves home at 740ms, draining at 1040ms) with room
@@ -1679,7 +1728,11 @@ window.addEventListener("message", function (e) {
     return;
   }
   if (d.type === "switched") {
-    if (document.fullscreenElement) {
+    // Compare against the FRAME, not merely "is anything fullscreen". The book
+    // itself goes fullscreen when it opens (enterFullscreen on the cover's Play),
+    // so document.fullscreenElement is truthy for the whole reading — testing it
+    // bare would report every switch as granted, including a refused one.
+    if (document.fullscreenElement === frame) {
       // Granted. A fullscreen element renders in the browser's TOP LAYER, above
       // everything in the page including this mask — so the mask is now invisible
       // no matter how long it stays. Hold it well past the wipe and drop it with
@@ -1697,12 +1750,28 @@ window.addEventListener("message", function (e) {
     }
     return;
   }
+  if (d.type === "left") {
+    if (gameLeftHandler) { const h = gameLeftHandler; gameLeftHandler = null; h(); }
+    return;
+  }
   if (d.type === "end") {
-    gameDone[idx] = true;
-    if (frame) frame.classList.add("done");    // .done drops pointer-events (CSS)
-    if (idx === flipped) dialogueDone(idx);    // → the turn cue, now it is welcome
+    // The celebration has STARTED. Let it play at full size — it is the reward —
+    // and hand the reader back to the book when it is over, not now. Nothing about
+    // the page changes yet: see returnFromGame for why gameDone waits.
+    clearTimeout(gameEndTimer);
+    // Backstop, for a celebration that never reports finishing (a missing video:
+    // LBD 1 falls back to `setTimeout(restartGame, 1500)` on `onerror`, and then
+    // no `ended` event is ever fired). Both celebrations are 4.02s; LBD 1 starts
+    // its one at DRAIN_AT, ~1s after it says `end`, so ~5.1s is the longer case.
+    gameEndTimer = setTimeout(function () { returnFromGame(idx); }, 6000);
+  } else if (d.type === "endDone") {
+    // The celebration has FINISHED playing. Both games freeze on its last frame,
+    // so there is nothing left to watch full screen: give the book back.
+    clearTimeout(gameEndTimer);
+    gameEndTimer = setTimeout(function () { returnFromGame(idx); }, 500);
   } else if (d.type === "restart") {
     gameDone[idx] = false;
+    clearTimeout(gameEndTimer);                // playing again → not going back yet
     if (frame) frame.classList.remove("done"); // the game is playable again
   }
 });

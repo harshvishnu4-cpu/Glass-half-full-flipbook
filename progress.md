@@ -13,7 +13,72 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the hamburger is gone, and the LBD switch stopped snapping
+## 2026-08-11 (latest) — a finished game gives the book back
+
+A game is played **fullscreen**, so when it ended the reader was left looking at a
+celebration filling the screen with the book nowhere in sight: no page to turn, no
+arrow, no hand, and no way onward except finding Esc. The page-turn cue was firing
+the instant the game said `end` — behind a fullscreen celebration nobody could see
+past. Now the game hands the book back.
+
+### The sequence
+
+1. `end` — the celebration has **started**. Nothing about the page changes: it is
+   the reward, so it plays at full size.
+2. `endDone` — the celebration has **finished**. A separate message because it is a
+   separate moment: LBD 1 shows its card at `SPLASH_COVER_AT` but does not start
+   the video until `DRAIN_AT`, ~1s later, and both celebrations run 4.02s.
+3. The book posts `leave`; the game exits **its own** fullscreen and answers `left`.
+4. Only then does the book take the page over — `gameDone`, `.done`, and the turn
+   cue — with two rAFs first so the book is laid out at window size before the hand
+   and ghost peel (positioned in % of the page) start animating.
+
+### Two things this got wrong first
+
+- **`gameDone` was being set at `end`.** That flag is what opens `canShowHint`'s
+  gate, so setting it early was itself what armed the cue behind the fullscreen
+  celebration — measured at 148ms after `end`. It now waits for the return. Same
+  for `.done`: dropping the frame's pointer-events during the celebration took
+  away the game's own taps, and **LBD 1's end card waits for a tap to replay**.
+- **The book cannot exit the game's fullscreen.** Calling `document.exitFullscreen()`
+  from the book shrank the frame but left the book's own
+  `document.fullscreenElement` still pointing at the iframe — a half-exited state.
+  Fullscreen was requested on the game's own `documentElement`, so only the game's
+  document can release it. Hence `leave`/`left`.
+
+### And a check that was quietly wrong
+
+The book **already goes fullscreen when it opens** (`enterFullscreen` on the
+cover's Play tap), so `document.fullscreenElement` is truthy for the whole
+reading. Both places that asked "is anything fullscreen?" now compare against the
+**frame** instead — otherwise every switch reads as granted, including a refused
+one. This is also why the return works so neatly: releasing the game's fullscreen
+restores the book's, so the reader lands back in the **fullscreen book**, not a
+windowed browser.
+
+### Verified over HTTP (the only path where fullscreen happens)
+
+Both games, driven to their end screens:
+
+| | LBD 1 | LBD 2 |
+| --- | --- | --- |
+| celebration plays full size | 1280×800 for 4.1s | 1280×800 for 4.1s |
+| `endDone` → `left` | 546ms | 523ms |
+| frame back to page size | yes (1126×634) | yes (1126×634) |
+| cue arrives **after** the return | yes | yes |
+| page turns | 8 → 9 | 10 → 11 |
+
+Screenshot after the return confirms it: the frozen celebration held in the page,
+the desk around the book, and the forward arrow cueing the turn.
+
+One testing note: park the pointer off the book (`mouse.move(4, 4)`) before
+sampling. `.done` makes the frame pointer-transparent, and a peel completes at
+**15%** (`prog > 0.15`), so a mouse left sitting over the page turns it and looks
+like a product bug. It is not — that cost me a wrong diagnosis.
+
+---
+
+## 2026-08-11 — the hamburger is gone, and the LBD switch stopped snapping
 
 Two things: remove the testing hamburger from the book, and make the game-opening
 transition smooth — LBD 1 above all.

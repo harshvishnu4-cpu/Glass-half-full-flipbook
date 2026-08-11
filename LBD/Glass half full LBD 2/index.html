@@ -258,8 +258,38 @@
         // the belt to that braces in case a future change tweens a class instead.
         new MutationObserver(check).observe(win, { attributes: true, attributeFilter: ['style', 'class'] });
         var poll = setInterval(function () { check(); if (told) clearInterval(poll); }, 400);
+        // And report again when the celebration has finished playing (4.02s). The
+        // book holds off leaving fullscreen until then, so the reward is watched
+        // full size; only once there is nothing left to watch does it shrink back
+        // into the page and invite the reader to turn on. The last frame stays up.
+        var winVid = document.getElementById('win-bg');
+        if (winVid) winVid.addEventListener('ended', function () {
+          try { window.parent.postMessage({ source: 'lbd', type: 'endDone' }, '*'); } catch (e) {}
+        });
       }
     }
+
+      // ── HAND THE READER BACK TO THE BOOK ───────────────────────────────────
+      // The book asks for this once the celebration has finished playing. Exiting
+      // must happen HERE: fullscreen was requested on this document's own
+      // documentElement, so the element lives inside this frame and only this
+      // document can release it cleanly — the book calling exitFullscreen() from
+      // outside shrank the frame but left its own document.fullscreenElement still
+      // pointing at the iframe. Answer `left` either way so the book stops waiting.
+      window.addEventListener('message', function (ev) {
+        if (!ev.data || ev.data.source !== 'book' || ev.data.type !== 'leave') return;
+        var reply = function () {
+          try { window.parent.postMessage({ source: 'lbd', type: 'left' }, '*'); } catch (e) {}
+        };
+        var ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) { reply(); return; }
+        if (!ex) { reply(); return; }
+        try {
+          var q = ex.call(document);
+          if (q && q.then) q.then(reply, reply); else setTimeout(reply, 120);
+        } catch (e) { reply(); }
+      });
+
   })();
   </script>
 </body>
