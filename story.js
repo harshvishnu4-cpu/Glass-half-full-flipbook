@@ -40,7 +40,16 @@
                 once the glass is full — the page unlocks after it finishes).
 
    • A single-image page (no scenes):  { type:"image", src, bubble }
-     A single-video page:              { type:"video", src, delay }
+     A single-video page:              { type:"video", src, delay, iris }
+     A whole mini-game as a page:      { type:"game", src, title }
+       src   : that game's own index.html — it is hosted in an iframe filling the
+               page, so everything inside it (drags included) belongs to the game.
+               Loaded only when the reader reaches the page, and unloaded when
+               they leave, so it cannot keep playing behind a turned page.
+       title : what a screen reader announces for the frame.
+     iris (on a video page): { at, x, y, size } — closes the page to black around
+       a circle centred on x/y, `size` wide (% of the page width), starting `at`
+       ms into the clip. Used on the last page to hold the glass spotlit.
 
    • A speech bubble:  bubble: { kind:"speech", text, box, flip, typeSpeed }
        text     : the words. Use "\n" to choose where the line breaks.
@@ -84,11 +93,12 @@ window.STORY = {
      are only labels, not the reader's page count.
 
      The reader can only turn a page once its clip has FINISHED: the forward
-     arrow stays hidden while the video plays, then fades in and blinks gold, and
-     the hand nudge appears on the page corner 2s later. (The back arrow is
-     always available.)
+     arrow fades in, and a breath later ONE cue guides them — the arrow's gold
+     glow, the hand on the page corner and a ghost page-peel, all together on the
+     same beat. (The back arrow is always available.)
 
      Pages 5 and 6 are multi-scene; page 6 ends in the interactive POUR game.
+     Pages 9 and 11 are the two LBD mini-games; page 12 closes with the iris.
      ──────────────────────────────────────────────────────────────────────── */
   pages: [
     { type: "video", src: "assets/pages/Page 1.mp4"  },   // 11s
@@ -221,131 +231,3 @@ window.STORY = {
     { type: "end" },   // ← keep this last: the closing "The End" page
   ]
 };
-
-/* ============================================================================
-   The storyboard version of this book (still images + typed speech bubbles) is
-   kept below for reference — it is INERT (the assignment above is what runs).
-   Delete it once the video book is final.
-   ============================================================================
-window.STORY_STORYBOARD = {
-  cover: "assets/Cover Page.webp",
-  music: "sfx/BG Music.mp3",
-  pages: [
-    // ── PAGE 1: city → theatre → popcorn ──────────────────────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page1.1.png", hold: 3500 },   // narrator (voice-over only)
-        { src: "assets/pages/page1.2.png",
-          bubble: { kind: "speech", text: "I am so excited\nfor the show!",
-                    box: { top: "32%", left: "10%", w: 225 } } },
-        { src: "assets/pages/page1.3.png",
-          bubble: { kind: "speech", text: "But let us get\nsomething to eat first.", flip: true,
-                    box: { top: "20%", left: "3%", w: 330 } } },
-        { src: "assets/pages/page1.4.png", fx: "popcorn",
-          bubble: { kind: "speech", text: "Popcorn jumping!\nPopcorn jumping!",
-                    box: { top: "36%", left: "8%", w: 270 } } },
-        { src: "assets/pages/page1.5.png",
-          bubble: { kind: "speech", text: "This is going\nto be fun!",
-                    box: { top: "8%", left: "59%", w: 200 } } },
-    ] },
-    // ── PAGE 2: in the auditorium — Byte senses something ─────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page2.1.png", hold: 3500 },              // narrator VO
-        { src: "assets/pages/page2.2.png", hold: 3000, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page2.3.png", hold: 2500, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page2.4.png", hold: 2500, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page2.5.png",
-          bubble: { kind: "speech", text: "Error! Error!",
-                    box: { top: "11%", left: "63%", w: 170 } } },
-    ] },
-    // ── PAGE 3: the necklace glows — Byte heads for the stage ─────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page3.1.png", hold: 2500,
-          fx: { type: "pulse", x: "48%", y: "62%" } },              // necklace glow
-        { src: "assets/pages/page3.2.png",
-          bubble: { kind: "speech", text: "Byte?",
-                    box: { top: "11%", left: "48%", w: 125 } } },
-        { src: "assets/pages/page3.3.png",
-          bubble: { kind: "speech", text: "BYTE!",
-                    box: { top: "8%", left: "51%", w: 125 } } },
-        { src: "assets/pages/page3.4.png",
-          bubble: { kind: "speech", text: "Wait for me!",
-                    box: { top: "10%", left: "36%", w: 185 } } },
-    ] },
-    // (page4 = suit-up video — art coming: "Alright!! Ready, steady, launch!")
-    // ── PAGE 4 (art: page5.x): on stage — the scan verdict ────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page5.1.png",
-          bubble: { kind: "speech", text: "Byte, tell me\nwhat is wrong.",
-                    box: { top: "9%", left: "47%", w: 218 } } },
-        { src: "assets/pages/page5.2.png", hold: 2500, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page5.3.png", hold: 3000, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page5.4.png", hold: 4000 },              // narrator VO
-        { src: "assets/pages/page5.5.mp4" },                          // narrator VO (video)
-    ] },
-    // ── PAGE 5 (art: page6.x): the batteries plan ────────────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page6.1.png",
-          bubble: { kind: "speech", text: "Look! These must\nbe the batteries.", flip: true,
-                    box: { top: "12%", left: "45%", w: 262 } } },
-        { src: "assets/pages/page6.2.png",
-          bubble: { kind: "speech", text: "Let us use them to\ncharge the bots.", flip: true,
-                    box: { top: "13%", left: "46%", w: 272 } } },
-        { src: "assets/pages/page6.3.png",
-          bubble: { kind: "speech", text: "Mission\naccepted.",
-                    box: { top: "7%", left: "66%", w: 200 } } },
-    ] },
-    // ── PAGE 6 (art: page7.x): charged! …then chaos ──────────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page7.1.png", hold: 3500, fx: "sparkle" },  // narrator VO
-        { src: "assets/pages/page7.2.png", hold: 3000, fx: "shake" },    // SFX chaos
-        { src: "assets/pages/page7.3.png",
-          bubble: { kind: "speech", text: "Oh no! What\nis going on?", flip: true,
-                    box: { top: "11%", left: "20%", w: 200 } } },
-        { src: "assets/pages/page7.4.png",
-          bubble: { kind: "speech", text: "Why is this\nhappening?",
-                    box: { top: "11%", left: "58%", w: 200 } } },
-    ] },
-    // ── PAGE 7 (art: page8.x): wrong code → the fix plan ─────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page8.1.png", hold: 3000, fx: "scan" },  // Byte VO (off-screen)
-        { src: "assets/pages/page8.2.png",
-          bubble: { kind: "speech", text: "Aha! Their codes\nare messed up.",
-                    box: { top: "12%", left: "53%", w: 250 } } },
-        { src: "assets/pages/page8.3.png",
-          bubble: { kind: "speech", text: "Let us fix them.",
-                    box: { top: "10%", left: "46%", w: 222 } } },
-    ] },
-    // ── PAGE 8 (art: page9.x): fixed! the show can begin ─────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page9.1.png",
-          bubble: { kind: "speech", text: "Yay! All fixed.",
-                    box: { top: "11%", left: "49%", w: 200 } } },
-        { src: "assets/pages/page9.2.png", hold: 3500 },              // narrator VO
-    ] },
-    // ── PAGE 9 (art: page10.x): choose a dance group → they perform ──────
-    { type: "image", scenes: [
-        { src: "assets/pages/page10.1.png", hold: 4000 },                 // narrator VO
-        { src: "assets/pages/page10.2.png", hold: 3000, fx: "sparkle" },  // group 1
-        { src: "assets/pages/page10.3.png", hold: 3000, fx: "sparkle" },  // group 2
-    ] },
-    // ── PAGE 10 (art: page11.x): they're dancing! …Byte? ─────────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page11.1.png",
-          bubble: { kind: "speech", text: "Look, Byte! They\nare dancing.",
-                    box: { top: "10%", left: "70%", w: 240 } } },
-        { src: "assets/pages/page11.2.png",
-          bubble: { kind: "speech", text: "Byte?",
-                    box: { top: "10%", left: "49%", w: 125 } } },
-    ] },
-    // ── PAGE 11 (art: page12.x): Byte dances with the bots ───────────────
-    { type: "image", scenes: [
-        { src: "assets/pages/page12.1.mp4" },                         // video, advances on end
-        { src: "assets/pages/page12.2.png", fx: "sparkle",
-          bubble: { kind: "speech", text: "Nice moves\nByte!",
-                    box: { top: "67%", left: "38%", w: 200 } } },
-    ] },
-
-    { type: "end" },
-  ]
-};
-============================================================================ */

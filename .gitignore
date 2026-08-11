@@ -4,18 +4,14 @@
 # of it should not ship with the book.
 LBD/*/node_modules/
 
-# ⚠ NOT SOLVED BY THIS FILE — read before committing:
-# Each game folder still carries its OWN .git directory, so `git add` stages it as
-# an embedded repository ("gitlink") instead of the files:
-#     warning: adding embedded git repository: LBD/Glass half full LBD 1
-# A clone or a Vercel deploy of THIS repo would then contain two EMPTY game
-# folders, and both game pages would come up blank. Ignoring the nested .git does
-# not change that — git decides on the presence of .git on disk.
-# To actually ship the games, their nested .git directories have to go:
-#     rm -rf "LBD/Glass half full LBD 1/.git" "LBD/Glass half full LBD 2/.git"
-# Checked before suggesting it: both are fully pushed (HEAD == origin/main, no
-# uncommitted files, no unpushed commits) to
+# HISTORY — why the games once deployed as 404s, so it is not repeated:
+# each game folder used to carry its OWN .git, which made `git add` stage it as an
+# embedded repository instead of its files. Commit 41e0986 recorded exactly two
+# entries for LBD/ — both mode 160000 (gitlink) — so a clone or Vercel build got
+# two EMPTY game folders and both game pages 404'd. Ignoring the nested .git does
+# NOT help; git decides on the presence of .git on disk, not on ignore rules.
+# The nested repos have been removed and the 144 real game files are tracked here.
+# Their history lives on their own remotes if either is ever needed again:
 #   github.com/yuvrajsingh-alt/THE-GLASS-HALF-FULL
 #   github.com/harshvishnu4-cpu/Glass-Half-full-LBD-2-
-# so the history survives on those remotes and the folders can be re-cloned.
-# That also drops the book's LBD payload from 204MB to about 22MB.
+# If a game folder is ever re-cloned INTO this repo, delete its .git again.

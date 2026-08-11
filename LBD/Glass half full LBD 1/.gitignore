@@ -1,0 +1,19 @@
+# ── build/dev junk ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+*.log
+
+# ── local asset backups (never deploy: ~163 MB) ───────────────
+_assets_backup_*/
+_preopt_backup_*/
+
+# ── dev tooling / editor ──────────────────────────────────────
+# (debug.js stays tracked: it is fetched on demand only by ?debug=1)
+.vscode/
+.claude/
+
+# ── design docs & scratch ─────────────────────────────────────
+Game-engineer/
+index-old-spooky.html

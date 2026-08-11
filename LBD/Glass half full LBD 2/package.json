@@ -1,0 +1,17 @@
+{
+  "name": "glass-half-full-game",
+  "version": "1.0.0",
+  "description": "The Glass Half Full - drag-and-drop sorting game (HTML/CSS/JS + GSAP), implemented from Figma",
+  "scripts": {
+    "start": "npx serve .",
+    "test": "node tools/e2e.js",
+    "check": "node tools/gen-manifest.js && node tools/check-css.js && node tools/check-dead.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "puppeteer-core": "^25.3.0"
+  }
+}

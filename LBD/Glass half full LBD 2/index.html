@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>The Glass Half Full</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥤</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="viewport">
+    <div id="stage">
+      <!-- Scene layers (exported from Figma, WebP) -->
+      <img class="layer" id="bg"     src="assets/img/bg.webp"        alt="">
+      <img class="layer" id="ground" src="assets/img/ground.webp"    alt="">
+      <img class="layer" id="trays"  src="assets/img/trays.webp"     alt="">
+
+      <!-- Phase 2: spooky customers & serving counter (hidden until sorting is done) -->
+      <div id="customer-layer">
+        <img class="customer" id="char-reaper"  src="assets/img/char-reaper.webp"  alt="Little reaper customer">
+        <img class="customer" id="char-wolf"    src="assets/img/char-wolf.webp"    alt="Wolf customer">
+        <img class="customer" id="char-mummy"   src="assets/img/char-mummy.webp"   alt="Mummy customer">
+        <img class="customer" id="char-vampire" src="assets/img/char-vampire.webp" alt="Vampire customer">
+        <img class="customer" id="char-zombie"  src="assets/img/char-zombie.webp"  alt="Zombie customer">
+      </div>
+      <img class="layer phase2" id="trays2"   src="assets/img/trays2.webp"   alt="">
+      <img class="layer phase2" id="lemonbox" src="assets/img/lemonbox.webp" alt="">
+      <img class="layer phase2" id="strawbox" src="assets/img/strawbox.webp" alt="">
+
+      <div id="sky-sparkles"></div>
+
+      <!-- per-tray highlight art: the same trays cut out with alpha, laid
+           exactly over the scene layer so the tutorial hint can glow along
+           each tray's real silhouette (hidden until a hint calls for it) -->
+      <img class="tray-glow" id="glow-empty" src="assets/img/tray-empty.webp" alt="">
+      <img class="tray-glow" id="glow-half"  src="assets/img/tray-half.webp"  alt="">
+      <img class="tray-glow" id="glow-full"  src="assets/img/tray-full.webp"  alt="">
+
+      <!-- Drop zones (invisible; glow while a glass hovers over them) -->
+      <div class="tray-zone" id="zone-empty" data-type="empty"></div>
+      <div class="tray-zone" id="zone-half"  data-type="half"></div>
+      <div class="tray-zone" id="zone-full"  data-type="full"></div>
+      <div class="tray-zone" id="zone-customer"></div>
+
+      <div id="glass-layer"></div>
+
+      <!-- Gold plaques (level 1 only — level 2's serving trays carry none) -->
+      <div class="plaque" id="plaque-empty"><span>Empty</span></div>
+      <div class="plaque" id="plaque-half"><span>Half</span></div>
+      <div class="plaque" id="plaque-full"><span>Full</span></div>
+
+      <img id="demand-bubble" src="assets/img/bubble-half.svg" alt="Customer order">
+      <div id="serve-bubble"></div>
+
+      <!-- Agni peeks in from the left and speaks every line of guidance
+           through his bubble (Figma node 670:1298) -->
+      <div id="agni">
+        <img id="agni-img" src="assets/img/agni-peek.webp" alt="Agni the dragon">
+        <div id="agni-bubble"><span id="agni-text"></span></div>
+      </div>
+
+      <div id="fx-layer"></div>
+
+      <!-- end / success screen: the celebration plays once, then the game
+           returns to the title screen (whose Play button restarts the game).
+           preload="none": the preloader fetches the video, so the element
+           must not download it a second time -->
+      <div id="win-overlay">
+        <video id="win-bg" src="assets/img/endscreen.webm" poster="assets/img/endscreen.webp"
+               playsinline preload="none" aria-label="Sold out! You served every customer."></video>
+      </div>
+
+      <!-- title screen (Spooky Rush logo art); the Play button stays hidden
+           behind the juice loading bar until every asset is fetched -->
+      <div id="title-screen">
+        <img id="title-bg" src="assets/img/title.webp" alt="Spooky Rush">
+        <div id="load-wrap" aria-hidden="true">
+          <div id="load-bar"><div id="load-fill"></div></div>
+          <span id="load-txt">Pouring the juice… 0%</span>
+        </div>
+        <button id="play-btn" aria-label="Play"><img src="assets/img/playbutton.webp" alt="Play"></button>
+      </div>
+
+      <!-- liquid splash transition: a juice blob bursts from the center to
+           cover the screen (with flying droplets), then drains off the
+           bottom behind the drippy wave sheets -->
+      <div id="splash">
+        <img id="splat" src="assets/img/splash.webp" alt="">
+        <div class="wave wave-back">
+          <svg viewBox="0 0 1920 1900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#b8156f" d="M0 150 Q240 70 480 140 T960 120 T1440 150 T1920 110 L1920 1560 Q1800 1680 1680 1590 T1440 1600 T1200 1580 T960 1620 T720 1580 T480 1620 T240 1580 L0 1620 Z"/>
+          </svg>
+        </div>
+        <div class="wave wave-front">
+          <svg viewBox="0 0 1920 1900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#F77ADE" d="M0 130 Q160 50 320 115 T640 95 T960 130 T1280 90 T1600 125 T1920 105 L1920 1520 Q1848 1660 1776 1568 Q1704 1500 1632 1552 Q1560 1710 1488 1580 Q1416 1504 1344 1548 Q1272 1672 1200 1560 Q1128 1502 1056 1546 Q984 1706 912 1576 Q840 1506 768 1548 Q696 1668 624 1556 Q552 1500 480 1544 Q408 1700 336 1572 Q264 1508 192 1550 Q120 1662 48 1560 L0 1600 Z"/>
+            <g fill="#F77ADE">
+              <circle cx="300" cy="1750" r="18"/><circle cx="760" cy="1800" r="14"/><circle cx="1180" cy="1760" r="20"/>
+              <circle cx="1560" cy="1820" r="12"/><circle cx="960" cy="1850" r="16"/><circle cx="90" cy="1720" r="10"/>
+              <circle cx="1830" cy="1770" r="15"/><circle cx="520" cy="1730" r="11"/>
+            </g>
+            <g fill="#ff9edd" opacity="0.55">
+              <circle cx="420" cy="380" r="22"/><circle cx="980" cy="460" r="26"/><circle cx="1560" cy="400" r="18"/>
+              <circle cx="700" cy="820" r="24"/><circle cx="1280" cy="900" r="20"/>
+              <circle cx="260" cy="1200" r="16"/><circle cx="1130" cy="1300" r="14"/><circle cx="1700" cy="1150" r="17"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- shown on portrait phones: the game is designed for landscape -->
+  <div id="rotate-overlay">
+    <div id="rotate-inner">
+      <div id="rotate-icon">📱</div>
+      <p>Please rotate your device<br>to play!</p>
+    </div>
+  </div>
+
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/sfx.js"></script>
+  <script src="js/preload-manifest.js"></script>
+  <script src="js/preload.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,446 @@
+@font-face {
+  font-family: 'Lilita One';
+  src: url('../assets/fonts/lilita-one.woff2') format('woff2');
+  font-display: swap;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* The board never scrolls or rubber-bands: dragging a glass past the edge
+   used to pan the page itself on touch devices, and a slow drag could start
+   a text/image selection that left the glass stuck to the cursor. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  background: #14080a;
+  font-family: 'Lilita One', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#viewport { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+
+/* Fixed 1920x1080 stage, scaled to fit the window from JS. overflow:hidden
+   clips oversized effects (splash waves, entering characters) to the stage,
+   so nothing spills into the letterbox margins on non-16:9 windows */
+#stage {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1920px; height: 1080px;
+  transform-origin: 0 0;
+  overflow: hidden;
+}
+
+img { user-select: none; -webkit-user-drag: none; }
+
+.layer { position: absolute; pointer-events: none; }
+/* full-scene backdrop: starry sky, side posts & top curtains baked in */
+#bg     { left: 0;    top: 0;     width: 1920px; height: 1080px; z-index: 1; }
+#ground { left: 0;    top: 610px; width: 1920px; height: 470px; z-index: 3; }
+/* the trays artwork is drawn on a white card; multiply drops the white
+   against the wooden counter exactly like the Figma composite */
+#trays  { left: 42px; top: 710px; width: 1834px; height: 344px; z-index: 4; mix-blend-mode: multiply; }
+
+/* customers stand behind the counter: above the sky, below the wood.
+   clip to the stall opening so they slide in from BEHIND the wooden side
+   posts (which are baked into the background) instead of over them */
+#customer-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  clip-path: inset(0 56px 0 64px);
+}
+.customer {
+  position: absolute;
+  transform-origin: 50% 100%;
+  opacity: 0;
+  visibility: hidden;
+}
+/* Every customer is normalised to the same 440px VISIBLE body height, feet on
+   a common ground line behind the counter (visible top 305 + 440 = feet at
+   745). These exports carry differing transparent margins, so width/left/top
+   are derived from each sprite's measured alpha bounding box — the canvas is
+   wider and taller than the body (tools: scratchpad char-measure probe).
+   left keeps each body centred on the x-centres game.js PHASE2 expects. */
+#char-reaper  { left: 177px;    top: 276.8px; width: 361.4px; }
+#char-wolf    { left: 872.2px;  top: 284.4px; width: 317.8px; }
+#char-mummy   { left: 1341.5px; top: 276.5px; width: 326px; }
+#char-vampire { left: 578.5px;  top: 305px;   width: 313.3px; }
+#char-zombie  { left: 1121px;   top: 298.9px; width: 318.3px; }
+
+/* phase-2 counter dressing */
+.phase2 { opacity: 0; visibility: hidden; }
+#trays2   { left: 686px; top: 718px; width: 1234px; height: 362px; z-index: 4; mix-blend-mode: multiply; }
+/* the garnish boxes are tappable: one tap dresses every glass */
+#lemonbox { left: 53px;  top: 706px; width: 305px; z-index: 4; pointer-events: auto; cursor: pointer; }
+#strawbox { left: 381px; top: 668px; width: 305px; z-index: 4; pointer-events: auto; cursor: pointer; }
+
+#sky-sparkles { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.sparkle {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+}
+
+.tray-zone {
+  position: absolute;
+  z-index: 6;
+  border-radius: 30px;
+  opacity: 0;
+  /* soft wash used only as hover feedback while dragging */
+  background: radial-gradient(closest-side, rgba(255, 214, 92, 0.30), rgba(255, 214, 92, 0));
+  pointer-events: none;
+}
+/* hint: the target tray itself lights up — the cut-out tray art fades in
+   over the scene layer and pulses with a golden halo that follows the
+   tray's silhouette (a CSS animation, so the drag-hover opacity tweens on
+   .tray-zone can never cancel it) */
+.tray-glow {
+  position: absolute;
+  z-index: 5;              /* above the tray scene layer, below the glasses */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* fade in and out gently; the visibility flip waits for the fade so the
+     layer is still released once the hint is over */
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+#glow-empty { left: 78px;   top: 750px; width: 555px; }
+#glow-half  { left: 672px;  top: 750px; width: 570px; }
+#glow-full  { left: 1289px; top: 750px; width: 561px; }
+.tray-glow.on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0s linear 0s;
+  /* slow, even breath; both keyframes list the SAME filter functions in the
+     same order so the browser interpolates them continuously (a mismatched
+     list makes the filter snap halfway through, which reads as a flicker) */
+  animation: trayLight 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  will-change: filter;
+}
+@keyframes trayLight {
+  from {
+    filter: drop-shadow(0 0 5px rgba(255, 214, 92, 0.35))
+            drop-shadow(0 0 14px rgba(255, 198, 60, 0.2))
+            brightness(1.02) saturate(1.02);
+  }
+  to {
+    filter: drop-shadow(0 0 18px rgba(255, 226, 130, 0.9))
+            drop-shadow(0 0 42px rgba(255, 198, 60, 0.62))
+            brightness(1.16) saturate(1.1);
+  }
+}
+#zone-empty { left: 90px;   top: 700px; width: 550px; height: 365px; }
+#zone-half  { left: 672px;  top: 700px; width: 578px; height: 365px; }
+#zone-full  { left: 1290px; top: 700px; width: 550px; height: 365px; }
+#zone-customer { top: 220px; width: 440px; height: 420px; border-radius: 50%; }
+
+/* the layer itself must not swallow taps meant for the garnish boxes below */
+#glass-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+
+.glass {
+  position: absolute;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+  pointer-events: auto;
+}
+.glass img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.glass.dragging { cursor: grabbing; }
+.glass.dragging img { filter: drop-shadow(0 20px 22px rgba(0, 0, 0, 0.45)); }
+.glass.placed { cursor: default; }
+/* tutorial spotlight on the full glass Agni is talking about */
+.glass.highlight img { animation: glassGlow 0.7s ease-in-out infinite alternate; }
+@keyframes glassGlow {
+  from { filter: drop-shadow(0 0 2px rgba(255, 210, 80, 0.35)); }
+  to   { filter: drop-shadow(0 0 26px rgba(255, 210, 80, 1)); }
+}
+
+.plaque {
+  position: absolute;
+  z-index: 8;
+  width: 356px; height: 97px;
+  background: url('../assets/img/plaque.webp') center / 100% 100% no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  padding-bottom: 8px;
+  pointer-events: none;
+}
+.plaque span { font-size: 65px; color: #972129; line-height: 1; }
+/* level 1 only — the level 2 serving trays are left unlabelled */
+#plaque-empty { left: 160px;  top: 968px; }
+#plaque-half  { left: 773px;  top: 969px; }
+#plaque-full  { left: 1405px; top: 969px; }
+
+/* The coins a customer pays: the pile MATERIALISES on the counter, holds, then
+   floats up and dissolves (see rewardCoins). The "treasure" read comes from the
+   filter here — a soft ground shadow plus a warm golden halo — which is why
+   plain coin art is enough and no glow is baked into the asset. */
+.coin-fly {
+  position: absolute;
+  left: 0; top: 0;
+  z-index: 10;
+  width: 92px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35))
+          drop-shadow(0 0 14px rgba(255, 215, 0, 0.85));
+  will-change: transform;
+}
+
+/* Designed order bubble ("Half Full" / "Full" comic box, tail points
+   down-right), FLOATING above the customer at the serve spot (x=960): the tail
+   points down at the head rather than resting on it, same as #serve-bubble.
+   Every customer's head top is normalised to y=305; at the old top:86 the tail
+   tip landed at y=348, i.e. 43px INSIDE the head, which read as the bubble
+   being stuck to it. top:31 puts the tip at y=293, a 12px gap above the head.
+   The art carries ~23% transparent padding along its top edge, so the drawn box
+   starts 62px below `top` — the visible bubble is y 93-293, clear of the stage
+   edge and clear of the head. */
+#demand-bubble {
+  position: absolute;
+  z-index: 9;
+  left: 669px; top: 31px;
+  width: 230px;
+  transform-origin: 94% 99%;   /* pop/shake pivots on the tail tip */
+  opacity: 0;
+  visibility: hidden;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+/* garnish-box nudge: warm glowing pulse until the box is tapped */
+.nudge-glow { animation: nudgeGlow 0.8s ease-in-out infinite alternate; }
+@keyframes nudgeGlow {
+  from { filter: drop-shadow(0 0 3px rgba(255, 215, 94, 0.35)); }
+  to   { filter: drop-shadow(0 0 26px rgba(255, 215, 94, 1)); }
+}
+
+/* customer thank-you bubble — the same comic speech box Agni uses, sized
+   down for the customers. Its tail hangs from the bottom at 54% of the
+   width, so JS centres that point over the customer's head. Padding keeps
+   the text inside the cream body, clear of the border and the tail. */
+#serve-bubble {
+  position: absolute;
+  z-index: 9;
+  /* floats clear of the head — the tail points down at it rather than
+     resting on it (the tallest customers' ears reach ~y=310) */
+  top: 104px;
+  width: 260px;
+  height: 196px;      /* the box art is 416x314 — same 1.32 aspect */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url('../assets/img/tut-bubble.webp') center top / 100% 100% no-repeat;
+  /* the cream body ends at y=155.4 (the tail runs to the bottom edge), so the
+     bottom pad is the one that centres the line on the body — 38px left it
+     sitting 6.6px low. Measured off tut-bubble.webp: body y 7.5-155.4. */
+  padding: 18px 24px 51px;
+  font-size: 28px;
+  line-height: 1.15;
+  color: #000;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Agni peeks around the left edge of the stall and speaks (Figma node
+   670:1298). Every coordinate is the design's own. The dragon art is the
+   design's already-clipped 526x756 crop, so it sits flush at left: 0. */
+/* no z-index here on purpose: the wrapper must not make a stacking context,
+   so the dragon and his bubble can sit at different depths */
+#agni {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+#agni-img {
+  position: absolute;
+  left: 0; top: 201px;
+  width: 526px; height: 756px;
+  /* in front of the counter and trays like the design, but behind the
+     glasses (7) so a glass dragged to the Empty tray is never hidden */
+  z-index: 6;
+}
+/* the bubble body is 582x187 at (241,140); the artwork's own canvas is a
+   touch larger because the outline strokes outside that box */
+#agni-bubble {
+  position: absolute;
+  z-index: 9;                 /* speech reads above everything on the counter */
+  left: 241px; top: 137.5px;
+  width: 584.87px; height: 192.22px;
+  box-sizing: border-box;
+  background: url('../assets/img/agni-bubble.webp') center / 100% 100% no-repeat;
+  /* Centred on the CREAM BODY, not on this box: the artwork's tail juts out
+     bottom-left, so the body sits 13.3px right of centre and ends at y=84.3
+     (the tail hangs below that). Padding — not text-align — carries both
+     offsets, so the line is optically centred instead of reading left-shifted
+     and high. Measured off agni-bubble.webp: body x 32.5-579, y 5-163.5.
+     Left+right still total 80px, so the wrap width is unchanged. */
+  padding: 16px 26.7px 38.5px 53.3px;
+  display: flex;
+  align-items: center;
+  font-size: 38px;
+  line-height: 1.16;
+  color: #77300c;
+}
+#agni-text { width: 100%; text-align: center; }
+
+/* tutorial: a translucent ghost of the glass drags itself to the tray */
+.glass-ghost {
+  position: absolute;
+  left: 0; top: 0;
+  z-index: 400;
+  /* Reads as a guiding phantom, not a grubby duplicate. At 65% opacity the
+     glass art blended with whatever sat behind it — muddy grey over the
+     night sky, washed-out over the red tray — and a black drop-shadow made
+     it dirtier still. It is now kept nearly opaque (the timeline drives the
+     actual value) and ringed with a warm glow instead. */
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 9px rgba(255, 226, 140, 0.95))
+          drop-shadow(0 0 22px rgba(255, 198, 60, 0.55));
+  will-change: transform;
+}
+
+#fx-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; }
+.spark {
+  position: absolute;
+  color: #ffd75e;
+  font-size: 36px;
+  line-height: 1;
+  text-shadow: 0 0 14px rgba(255, 215, 94, 0.9);
+  will-change: transform;
+}
+.confetti { position: absolute; top: -24px; will-change: transform; }
+
+#win-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  opacity: 0;
+  visibility: hidden;
+}
+#win-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- title screen ---------- */
+#title-screen { position: absolute; inset: 0; z-index: 12; }
+#title-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* juice loading bar — sits where the Play button will pop in */
+#load-wrap {
+  position: absolute;
+  left: 50%; bottom: 78px;
+  width: 480px;
+  margin-left: -240px;
+  text-align: center;
+}
+#load-bar {
+  height: 46px;
+  border: 4px solid #f7c463;               /* gold rim, like the tray plaques */
+  border-radius: 23px;
+  background: rgba(26, 10, 20, 0.75);      /* dark "empty glass" */
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45), inset 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+#load-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 19px;
+  background: linear-gradient(180deg, #ff9edd 0%, #f77ade 45%, #b8156f 100%); /* the juice */
+  box-shadow: inset 0 3px 4px rgba(255, 255, 255, 0.45);
+  transition: width 0.25s ease-out;
+}
+#load-txt {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 26px;
+  color: #ffe9c9;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+#play-btn {
+  position: absolute;
+  left: 50%; bottom: 60px;
+  width: 240px;
+  margin-left: -120px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  visibility: hidden; /* revealed with a pop once every asset is preloaded */
+}
+#play-btn img {
+  width: 100%;
+  display: block;
+  filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.35));
+}
+
+/* ---------- liquid splash transition ---------- */
+#splash {
+  position: absolute;
+  inset: 0;
+  z-index: 13;
+  display: none;
+  pointer-events: none;
+}
+.wave { position: absolute; left: 0; top: 0; width: 1920px; height: 1900px; will-change: transform; }
+.wave svg { width: 100%; height: 100%; display: block; }
+#splat {
+  position: absolute;
+  left: 442px; top: 30px;
+  width: 1035px; height: 1020px;
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform;
+}
+.splash-drop {
+  position: absolute;
+  left: 0; top: 0;
+  border-radius: 50%;
+  background: #F77ADE;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ---------- rotate-to-landscape prompt (portrait phones) ---------- */
+#rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: none;            /* toggled from JS by orientation */
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 24px;
+  background: radial-gradient(circle at 50% 40%, #241016 0%, #14080a 80%);
+  color: #fff4dc;
+  text-align: center;
+  font-family: 'Lilita One', system-ui, sans-serif;
+}
+#rotate-icon {
+  font-size: 84px;
+  line-height: 1;
+  animation: rotateHint 1.8s ease-in-out infinite;
+}
+#rotate-overlay p {
+  margin-top: 24px;
+  font-size: 34px;
+  line-height: 1.35;
+  color: #ffd75e;
+  text-shadow: 0 3px 0 #972129;
+}
+@keyframes rotateHint {
+  0%, 40%  { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(90deg); }
+}
