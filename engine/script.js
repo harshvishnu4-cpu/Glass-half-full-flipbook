@@ -665,6 +665,26 @@ pages.forEach(function (page, i) {
           '<span>Read again</span>' +
         '</button>' +
       '</div>';
+  } else if (page.type === "game") {
+    /* GAME page — a whole self-contained mini-game (its own index.html) hosted in
+       an iframe that fills the page, so the book can hand the reader an activity
+       without the engine knowing anything about it.
+       Two things worth knowing about the iframe boundary:
+         • Pointer events inside it do NOT reach this document, so the book's
+           drag-to-flip can never steal a drag from a drag-and-drop game. That is
+           why an iframe rather than an inlined script.
+         • For the same reason the engine cannot reach in to pause the game's
+           audio, so the frame is UNLOADED when the reader leaves the page (see
+           refreshMedia) — otherwise the game would keep talking from behind a
+           page that has been turned.
+       `src` is held in data-src and only assigned on arrival: loading two games
+       up front would cost megabytes before the reader has read page one. */
+    const fr = document.createElement("iframe");
+    fr.className = "page-game";
+    fr.title = page.title || "Game";
+    fr.dataset.src = encodeURI(page.src);
+    fr.setAttribute("allow", "autoplay; fullscreen");
+    front.appendChild(fr);
   } else if (page.scenes) {
     // MULTI-SCENE page: the storyboard screens stack as full-bleed layers and
     // the scene player (playScenes) cross-dissolves through them. Scene 0
@@ -1608,6 +1628,24 @@ function refreshMedia() {
     const v = leaf.querySelector("video.page-media");
     if (v) { try { v.pause(); } catch (_) {} }
   });
+  // GAME pages: load the frame only while the reader is ON the page, and send it
+  // to about:blank when they leave. The engine cannot pause a cross-origin frame
+  // (every file:// document is its own opaque origin), so unloading is the only
+  // way to stop a game narrating from behind a turned page. The cost is that a
+  // game restarts if the reader leaves it, which is the same rule the pour scene
+  // already follows. The book's own music is ducked while a game has the page.
+  let onGame = false;
+  leaves.forEach(function (leaf, i) {
+    const fr = leaf.querySelector("iframe.page-game");
+    if (!fr) return;
+    if (i === idx) {
+      onGame = true;
+      if (fr.getAttribute("src") !== fr.dataset.src) fr.setAttribute("src", fr.dataset.src);
+    } else if (fr.getAttribute("src") && fr.getAttribute("src") !== "about:blank") {
+      fr.setAttribute("src", "about:blank");
+    }
+  });
+  duckMusic(onGame);
   // This page's OWN video. (A video INSIDE a .page-scene belongs to the scene
   // player — playScenes starts it when its scene lands.)
   const cur = leaves[idx];
@@ -2505,6 +2543,12 @@ function dialogueDone(idx) {
 }
 
 function canShowHint() {
+  // Never on a GAME page. Pointer events inside its iframe do not reach this
+  // document, so the idle timer never gets reset while the reader is playing —
+  // the nudge would fire over the game and the ghost peel would lift the very
+  // page they are using. The corner arrow is armed from the moment a game page
+  // lands, so the way out is always visible without a nudge.
+  if (pages[flipped] && pages[flipped].type === "game") return false;
   return opened && ready && !animating &&
          hintDoneFor === flipped &&          // never before the scene completes
          flipped < totalPages - 1 && !document.hidden;

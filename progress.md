@@ -13,7 +13,88 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the arrow and the hand now guide together
+## 2026-08-11 (latest) — the two LBD games are pages in the book
+
+Author: the `LBD/` folder holds two games; game 1 goes after page 8, game 2 after
+page 9. The book is now **13 pages**: `…7, 8, GAME 1, 9, GAME 2, 10, THE END`.
+
+### A new `game` page type
+
+    { type: "game", title: "Pour the juice — game",
+      src: "LBD/Glass half full LBD 1/index.html" }
+
+Each game is a whole self-contained app (LBD 1 is one 252KB inline index.html;
+LBD 2 has `css/`, `js/` and a vendored `js/vendor/gsap.min.js`), hosted in an
+iframe that fills the leaf.
+
+**An iframe specifically, not inlined script.** Pointer events inside a frame do
+not reach the parent document, so the book's drag-to-flip can never steal a drag
+— and LBD 2 *is* a drag-and-drop game. Inlining it would have put the two drag
+systems in direct competition.
+
+Three consequences that had to be handled rather than discovered later:
+
+- **Lazy.** `src` lives in `data-src` and is only assigned on arrival. Loading two
+  games up front would cost megabytes before page one is read. Verified: both
+  frames have `src === null` at book load.
+- **Unloaded on leaving** (`src = "about:blank"`). The engine cannot pause a
+  cross-origin frame — every `file://` document is its own opaque origin — so
+  unloading is the only way to stop a game narrating from behind a page that has
+  been turned. The cost is that a game restarts if the reader leaves it, which is
+  the rule the pour scene already follows. The book's music is ducked while a game
+  holds the page.
+- **No idle nudge on a game page** (`canShowHint` returns false). Interactions
+  inside the frame never reach this document, so the idle timer would never reset
+  and the nudge would fire over the game — the ghost peel lifting the very page
+  being played on.
+
+**The forward arrow is live the moment a game page lands.** Neither game signals
+completion (no `postMessage`, checked), so there is nothing to gate on; arming
+immediately means nobody is trapped in a game they cannot finish, at the cost of
+letting a reader leave early. If either game later posts a "done" message, that
+becomes the gate.
+
+Verified: correct page order, lazy load, game 1's document really loads (its title
+reads "Ready Set Serve!") and fills 1267×713, leaving sets `about:blank`, game 2
+loads on its page, no errors in the host page, and the read-through walks all 13
+pages to THE END.
+
+### ⚠ The games will NOT deploy as-is
+
+Both game folders carry their **own `.git`**, so `git add` stages each as an
+embedded repository:
+
+    warning: adding embedded git repository: LBD/Glass half full LBD 1
+
+A clone — or a Vercel build — of this repo would contain two **empty** game
+folders, and both game pages would come up blank. **Ignoring the nested `.git`
+does not fix it** (tested: git decides on the presence of `.git` on disk, not on
+ignore rules). The nested repos have to go for the files to be tracked:
+
+    rm -rf "LBD/Glass half full LBD 1/.git" "LBD/Glass half full LBD 2/.git"
+
+Checked before suggesting that, rather than after: both are **fully pushed** —
+`HEAD == origin/main`, no uncommitted files, no unpushed commits — to
+`yuvrajsingh-alt/THE-GLASS-HALF-FULL` and `harshvishnu4-cpu/Glass-Half-full-LBD-2-`,
+so the history survives on those remotes and either folder can be re-cloned. Left
+for the author to run: they are their repos.
+
+Added a `.gitignore` for `LBD/*/node_modules/` (28MB, dev-only — neither game
+loads it at runtime) with that warning written out in full. Removing the two
+nested `.git`s plus node_modules takes the book's LBD payload from **204MB to
+about 22MB**.
+
+### A pre-existing bug inside game 1
+
+`ready set serve.ogg` is referenced by `LBD/Glass half full LBD 1/index.html` but
+**does not exist** anywhere in that folder — there is no such file and no `.m4a`
+twin, while every other sound in `sxf/` has both. It only became visible now
+because the book loads the game; the read-through reports
+`load fail: ready set serve.ogg`. It is game 1's own asset to add or de-reference.
+
+---
+
+## 2026-08-11 — the arrow and the hand now guide together
 
 Author: the arrow and hand nudge are not in sync; on completion they should come
 together. Measured before touching anything, on page 1:

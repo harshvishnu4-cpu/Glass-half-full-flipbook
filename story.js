@@ -183,7 +183,30 @@ window.STORY = {
     ] },
     { type: "video", src: "assets/pages/Page 7.mp4"  },   // 8s
     { type: "video", src: "assets/pages/Page 8.mp4"  },   // 16s
+
+    /* ── GAME 1 — after page 8 ──────────────────────────────────────────────
+       A whole self-contained mini-game as a page: its own index.html, hosted in
+       an iframe that fills the leaf.
+         • Everything inside the frame belongs to the game, DRAGS INCLUDED — that
+           isolation is why it is an iframe, so the book's drag-to-flip can never
+           steal a drag from a drag-and-drop game.
+         • The forward arrow is live as soon as the page lands, because neither
+           game tells the book when it is finished. Nobody gets trapped in a game
+           they cannot complete — but it also means the reader can leave early.
+         • Leaving UNLOADS the game (it would otherwise keep narrating from behind
+           a turned page), so returning restarts it. Same rule as the pour scene.
+       `title` is what a screen reader announces for the frame. */
+    { type: "game", title: "Pour the juice — game",
+      src: "LBD/Glass half full LBD 1/index.html" },
+
     { type: "video", src: "assets/pages/Page 9.mp4"  },   // 31s
+
+    // ── GAME 2 — after page 9 ───────────────────────────────────────────────
+    // The sorting/serving game (drag glasses to the Empty / Half Full / Full
+    // trays, then serve the customers). Same hosting rules as game 1 above.
+    { type: "game", title: "Sort and serve — game",
+      src: "LBD/Glass half full LBD 2/index.html" },
+
     // The last story page: the clip zooms into the full glass, then an IRIS
     // closes the page to black around it and holds it spotlit — the closing beat
     // before THE END. `at` is measured from the clip's own clock: the zoom has
