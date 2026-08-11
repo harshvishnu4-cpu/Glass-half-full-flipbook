@@ -1595,13 +1595,29 @@ function playScenes(idx, startDelay) {
    the origin: on file:// every document is an opaque origin, so origin checks
    cannot identify the sender, but window identity can. */
 const gameDone = {};
+// Which game frames have reported for duty. A frame whose document 404s still
+// fires `load` and is cross-origin, so silence is the only way to tell a missing
+// game from a working one — see the `game-missing` timer in refreshMedia.
+const gameReady = {};
+let gameReadyTimer = null;
+// How long the pink mask takes to spread over the screen. Must match the
+// .lbd-mask.up transition in styles.css, and must fit inside the covered window
+// of the game's wipe (LBD 1: waves home at 740ms, draining at 1040ms) with room
+// left for the switch itself, which measured ~50ms.
+const LBD_MASK_IN_MS = 160;
 let lbdMask = null, lbdMaskTimer = null;
-function clearLbdMask() {
+// `fast` fades in 120ms instead of 260ms. Used when the switch has reported in,
+// so the fade FINISHES inside the wipe's covered window instead of running on
+// into the reveal. The mask is the same #F77ADE as the wipe's waves, so the fade
+// has nothing to reveal — it only has to be over before the waves drain.
+function clearLbdMask(fast) {
   clearTimeout(lbdMaskTimer);
   if (!lbdMask) return;
   const m = lbdMask;
+  if (fast) m.classList.add("fast");
   m.classList.add("clearing");
-  setTimeout(function () { if (m.parentNode) m.parentNode.removeChild(m); }, 320);
+  setTimeout(function () { if (m.parentNode) m.parentNode.removeChild(m); },
+             fast ? 160 : 320);
   lbdMask = null;
 }
 window.addEventListener("message", function (e) {
@@ -1613,6 +1629,12 @@ window.addEventListener("message", function (e) {
     if (fr && fr.contentWindow === e.source) { idx = i; frame = fr; }
   });
   if (idx < 0) return;                         // not from a game we are hosting
+  if (d.type === "ready") {
+    gameReady[idx] = true;                     // it loaded — no "missing" notice
+    clearTimeout(gameReadyTimer);
+    if (leaves[idx]) leaves[idx].classList.remove("game-missing");
+    return;
+  }
   if (d.type === "covered") {
     // The game's wipe has the frame fully pink and is about to ask for
     // fullscreen. Paint the same pink over the WHOLE screen so the switch has
@@ -1625,23 +1647,54 @@ window.addEventListener("message", function (e) {
       lbdMask.className = "lbd-mask";
       lbdMask.setAttribute("aria-hidden", "true");
       document.body.appendChild(lbdMask);
+      // FADE it in rather than snapping. Appearing instantly was itself the
+      // visible event: measured on the composited frames, the screen went from
+      // 67% pink (the wipe filling the page-sized frame, desk still showing all
+      // round it) to 100% in a single frame — the desk snapping pink. Eased over
+      // LBD_MASK_IN_MS the pink instead spreads outward from the book, reading as
+      // the splash continuing past the page rather than as a flash.
+      void lbdMask.offsetWidth;                  // commit opacity:0 before the class
     }
-    lbdMask.classList.remove("clearing");
+    lbdMask.classList.remove("clearing", "fast");
+    lbdMask.classList.add("up");
     clearTimeout(lbdMaskTimer);
-    // Long enough to outlast the browser's own fullscreen animation, short enough
-    // that a refused switch does not leave a pink screen sitting there.
-    lbdMaskTimer = setTimeout(clearLbdMask, 1100);
-    // ACK, and only after the mask has actually PAINTED. The game waits for this
-    // before switching. Without the handshake it posted `covered` and switched in
-    // the same breath, giving the mask ~15ms — less than a frame in practice, so
-    // it was never on screen when the switch happened and did nothing at all.
-    // Two rAFs: the first runs before the paint that includes the mask, the second
-    // after it.
+    // Backstop only, for a game that never reports back. Generous, because a mask
+    // left up is now harmless (see `switched` below) while one torn down early
+    // would expose the switch.
+    lbdMaskTimer = setTimeout(function () { clearLbdMask(true); }, 2600);
+    // ACK once the fade has FINISHED, not merely started — the game waits for this
+    // before switching, and switching half way through the fade would show the
+    // resize through a semi-transparent mask. (The handshake itself matters at all
+    // because posting `covered` and switching in the same breath gave the mask
+    // ~15ms — under one frame — so it was never on screen when the switch happened
+    // and did nothing whatsoever.) Two rAFs so the fade is actually running before
+    // its duration is counted.
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        try { e.source.postMessage({ source: "book", type: "masked" }, "*"); } catch (_) {}
+        setTimeout(function () {
+          try { e.source.postMessage({ source: "book", type: "masked" }, "*"); } catch (_) {}
+        }, LBD_MASK_IN_MS);
       });
     });
+    return;
+  }
+  if (d.type === "switched") {
+    if (document.fullscreenElement) {
+      // Granted. A fullscreen element renders in the browser's TOP LAYER, above
+      // everything in the page including this mask — so the mask is now invisible
+      // no matter how long it stays. Hold it well past the wipe and drop it with
+      // no fade at all: nothing to time against the reveal, and if the reader
+      // leaves fullscreen early there is still pink rather than a bare desk.
+      clearTimeout(lbdMaskTimer);
+      lbdMaskTimer = setTimeout(function () {
+        if (lbdMask && lbdMask.parentNode) lbdMask.parentNode.removeChild(lbdMask);
+        lbdMask = null;
+      }, 2600);
+    } else {
+      // Refused (or already exited). Nothing is covering the mask, so get it off
+      // quickly — fast enough to be gone before the wipe's waves start draining.
+      clearLbdMask(true);
+    }
     return;
   }
   if (d.type === "end") {
@@ -1728,7 +1781,20 @@ function refreshMedia() {
     if (i === idx) {
       onGame = true;
       if (fr.getAttribute("src") !== fr.dataset.src) fr.setAttribute("src", fr.dataset.src);
+      // DID IT ACTUALLY LOAD? A frame whose document 404s still fires `load`, and
+      // being cross-origin there is nothing to inspect — so the book could not
+      // tell a missing game from a working one and just showed the frame's own
+      // background: a silent navy panel, which is what a reader reported.
+      // Each game posts `ready` as soon as it runs, so silence is the signal.
+      clearTimeout(gameReadyTimer);
+      if (!gameReady[i]) {
+        gameReadyTimer = setTimeout(function () {
+          if (flipped === i && !gameReady[i]) leaf.classList.add("game-missing");
+        }, 6000);
+      }
     } else if (fr.getAttribute("src") && fr.getAttribute("src") !== "about:blank") {
+      leaf.classList.remove("game-missing");
+      gameReady[i] = false;
       fr.setAttribute("src", "about:blank");
       // a fresh visit is a fresh game: it is reloaded, so it has not ended yet
       gameDone[i] = false;
@@ -2366,6 +2432,12 @@ function duckMusic(on) {
    mode. It hides the moment sound is recovered, or with its clip. */
 let soundHintEl = null, _soundHintFor = null;
 function showSoundHint(v) {
+  // Only for the page being read. This is called from playVideoNow's `catch`,
+  // which is ASYNCHRONOUS: a clip whose audible play() was refused can have its
+  // rejection land after the reader has already turned the page, and the chip
+  // would then appear over a page that has no clip at all — it was showing over
+  // the LBD game page, inviting a tap that could not fix anything.
+  if (!v || !leaves[flipped] || !leaves[flipped].contains(v)) return;
   _soundHintFor = v;
   if (!soundHintEl) {
     soundHintEl = document.createElement("div");

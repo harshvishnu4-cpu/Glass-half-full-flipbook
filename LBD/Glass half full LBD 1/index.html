@@ -4793,6 +4793,13 @@ initRound();
      simply makes Play fullscreen the page, which is no worse.               -->
 <script>
 (function () {
+  // Report in, so the book can tell a LOADED game from a missing one. A frame
+  // whose document 404s still fires `load` and is cross-origin, so the book has
+  // nothing to inspect — silence here is what makes it show its own notice
+  // instead of a blank page.
+  if (window.parent !== window) {
+    try { window.parent.postMessage({ source: 'lbd', type: 'ready' }, '*'); } catch (e) {}
+  }
   var btn = document.getElementById('playBtn');
   if (!btn) return;
 
@@ -4808,10 +4815,21 @@ initRound();
   // ⚠ This adds an opening wipe the game did not have. To go back to the old
   //    instant start, replace the body of the handler below with `start();`.
   //
-  // Timings come from the game's own TRANS table, so they cannot drift apart:
-  // BURST is when the splat has swallowed the board, DRAIN_AT when it starts
-  // clearing. The switch goes just after BURST, inside that covered window.
-  var COVERED = (typeof TRANS === 'object' && TRANS && TRANS.BURST) ? TRANS.BURST + 30 : 730;
+  // Timing comes from the game's OWN constants so the two cannot drift apart.
+  // The wipe holds full cover only from ~740ms (waves home, TRANS.BURST + 40) to
+  // TRANS.DRAIN_AT = 1040ms — a 300ms window — and the game already names the
+  // safe moment inside it: SPLASH_COVER_AT (820ms), which is where it swaps its
+  // own end screen in. Switching at BURST + 30 = 730ms was ~10ms BEFORE the waves
+  // were even home, so the switch straddled the moment the cover completed and
+  // was still settling as the drain began. That was the roughness. Use the game's
+  // own number: 80ms after full cover, 220ms of clearance before the drain.
+  // The wipe holds full cover from BURST + 40 (its own `coverAt` — the waves reach
+  // home) until DRAIN_AT = 1040ms. Ask at the START of that window, not the middle:
+  // the book now FADES its mask in over 160ms before answering `masked`, and the
+  // switch itself measured ~50ms, so asking at 740 lands the switch at ~950 — still
+  // 90ms clear of the drain. (Asking at 820 left too little room; asking at 730, as
+  // this first did, was before the waves were even home.)
+  var COVERED = (typeof TRANS === 'object' && TRANS && TRANS.BURST) ? TRANS.BURST + 40 : 740;
 
   var started = false;
   function start() {                    // fullscreen, then hand over to the game
@@ -4820,7 +4838,14 @@ initRound();
     var el = document.documentElement;
     var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
     var already = document.fullscreenElement || document.webkitFullscreenElement;
-    if (go && !already) {
+    // Only go through the mask-and-switch dance if the switch CAN actually happen.
+    // fullscreenEnabled is false inside a file:// frame (permission is denied on an
+    // opaque origin) and true over http, so a double-clicked book was asking for a
+    // full-screen pink mask that hid NOTHING: the reader saw this game's own pink
+    // wipe plus a pink flash across the desk around the book. Windowed, the wipe
+    // alone is seamless. (!== false so a browser without the property still tries.)
+    var canSwitch = document.fullscreenEnabled !== false;
+    if (go && !already && canSwitch) {
       // Ask the book to paint the same pink over the WHOLE screen first, and WAIT
       // for it to say the paint has landed. The wipe only covers this frame; the
       // frame growing from a page-sized box to the screen is plainly visible
@@ -4852,10 +4877,17 @@ initRound();
       el.style.background = '#F77ADE';
       setTimeout(function () { el.style.background = prev; },
                  (typeof TRANS === 'object' && TRANS && TRANS.CLEANUP) ? TRANS.CLEANUP : 2300);
+      // Report the outcome EITHER WAY so the book clears its pink mask the moment
+      // the switch has settled. On a fixed timer the mask outlived a refused
+      // switch (file://) and sat over the wipe's reveal.
+      var settled = function () {
+        try { if (window.parent !== window)
+          window.parent.postMessage({ source: 'lbd', type: 'switched' }, '*'); } catch (e2) {}
+      };
       try {
         var p = go.call(el, { navigationUI: 'hide' });
-        if (p && p.catch) p.catch(function () {});   // refused → carry on windowed
-      } catch (e) {}
+        if (p && p.then) p.then(settled, settled); else settled();
+      } catch (e) { settled(); }
     }
     if (window.parent === window) { go2(); return; }   // not framed → nothing to mask
     window.addEventListener('message', function onMsg(ev) {
@@ -4864,7 +4896,7 @@ initRound();
       go2();
     });
     try { window.parent.postMessage({ source: 'lbd', type: 'covered' }, '*'); } catch (e) {}
-    setTimeout(go2, 250);                              // no ack → go regardless
+    setTimeout(go2, 700);                              // no ack → go regardless
   }
 
   btn.addEventListener('click', function () {

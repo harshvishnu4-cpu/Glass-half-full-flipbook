@@ -1015,6 +1015,21 @@
        whole reason it is an iframe and not inlined script */
     pointer-events: auto;
   }
+  /* A game that never reported in (its files are missing on the host — the classic
+     cause is committing the game folder as an empty gitlink). Without this the
+     reader just got a silent navy panel: the frame's own --paper background, with
+     nothing to explain it. */
+  .leaf.game-missing .page-game { visibility: hidden; }
+  .leaf.game-missing .face.front::after {
+    content: "This game could not be loaded.";
+    position: absolute; inset: 0; z-index: 5;
+    display: grid; place-items: center; padding: 12%;
+    background: var(--paper);
+    color: #f6df8c; text-align: center;
+    font-family: Fredoka, Poppins, system-ui, sans-serif;
+    font-size: 30px; line-height: 1.5;
+    border-radius: inherit;
+  }
   /* MASK FOR THE FULLSCREEN SWITCH.
      Hiding the switch inside the game's own wipe was not enough, because the wipe
      only covers the IFRAME. At the moment fullscreen engages, the frame stops
@@ -1031,9 +1046,19 @@
     position: fixed; inset: 0; z-index: 9998;
     background: #F77ADE;
     pointer-events: none;
-    opacity: 1;
+    opacity: 0;
   }
+  /* Spreads over the screen instead of snapping on. Keep this duration in step
+     with LBD_MASK_IN_MS in script.js — the game is told to switch only once the
+     fade has finished, and that timing is driven from the script side. */
+  .lbd-mask.up { opacity: 1; transition: opacity 160ms ease-out; }
   .lbd-mask.clearing { opacity: 0; transition: opacity 260ms linear; }
+  /* Faster fade for the normal path, where the game has reported that its switch
+     settled. LBD 1's waves hold full cover only until 1040ms into its wipe, and
+     the switch settles around 890ms — so the fade has to be over in ~120ms or it
+     runs on into the reveal. The slower 260ms above is for the backstop timer,
+     where the switch never reported and there is no window to respect. */
+  .lbd-mask.clearing.fast { transition-duration: 120ms; }
   /* …until the game reports that it has ENDED (see the `lbd` message handler).
      Its end screen has nothing to tap, so handing gestures back to the book lets
      the reader DRAG the page to turn on, exactly as on every other page, instead

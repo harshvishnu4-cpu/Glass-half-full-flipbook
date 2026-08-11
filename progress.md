@@ -13,7 +13,96 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the fullscreen switch: pink before, pink after
+## 2026-08-11 (latest) — the hamburger is gone, and the LBD switch stopped snapping
+
+Two things: remove the testing hamburger from the book, and make the game-opening
+transition smooth — LBD 1 above all.
+
+### The hamburger
+
+`index.html` no longer loads `dev/dev-menu.js`. Its button sat in the top-left of
+**every** screen, cover included, which is not something a reader should see. The
+`dev/` folder is still on disk and completely inert without that one `<script>`
+tag; the comment left in its place says how to put it back for authoring.
+
+Note for future testing: scripts that navigated by clicking `.devm-btn` no longer
+work. Drive the engine directly instead — `window.dialogueDone(n)` then
+`window.goNext()`, reading the current page as
+`document.querySelectorAll("#flipbook .leaf.flipped").length`. (`goNext` and
+`dialogueDone` are top-level function declarations, so they are on `window`;
+`flipped` is a `let`, so it is **not**.)
+
+### Why the transition was still noticeable — measured, not guessed
+
+Captured real composited frames (CDP `Page.startScreencast`, **not**
+`page.screenshot()`, which awaits a paint and therefore cannot catch a
+mid-transition frame) and scored each one for how pink it was. Three separate
+faults showed up, none of them the one I had been assuming:
+
+1. **The switch fired before the screen was covered.** LBD 1's wipe holds full
+   cover only from `BURST + 40` = 740ms (waves home) to `DRAIN_AT` = 1040ms — a
+   300ms window. I was switching at `BURST + 30` = **730ms**, i.e. ~10ms *before*
+   the waves arrived, so the switch straddled the moment cover completed and was
+   still settling as the drain began.
+2. **The mask's own appearance was the visible event.** It had no fade in by
+   design ("it appears while the frame is already fully pink, so there is nothing
+   to ease") — but that was wrong: the wipe covers only the *iframe*, which is one
+   book page. The desk shows all around it. Frames measured **67% pink → 100% in a
+   single frame**: the desk snapping pink. The mask hid the resize and then
+   announced itself.
+3. **On `file://` the mask was pure cost.** `document.fullscreenEnabled` is
+   `false` inside a `file://` frame, so a double-clicked book could never switch —
+   yet the game asked for the mask anyway. The reader got the wipe *plus* a pink
+   flash across the desk, hiding nothing.
+
+### What changed
+
+- **Both games** now check `document.fullscreenEnabled !== false` before asking.
+  No switch possible → no mask, no handshake; the game's own wipe runs alone,
+  which is seamless. This is the double-click path, so it is the common case.
+- **The mask fades in** over `LBD_MASK_IN_MS` (160ms, `.lbd-mask.up`), so the pink
+  spreads outward from the book instead of snapping. It starts at `opacity: 0`
+  now — it is only visible once `.up` is added.
+- **`masked` is acked when the fade FINISHES**, not when it paints. Switching part
+  way through would show the resize through a semi-transparent mask. The games'
+  no-ack fallback went 250ms → 700ms so it cannot race the fade.
+- **LBD 1 asks at `BURST + 40` (740ms)** — the start of its covered window, not
+  the middle — because the fade now needs 160ms before the switch can go.
+- **A granted switch keeps the mask up** and drops it 2.6s later with no fade. A
+  fullscreen element renders in the browser's **top layer**, above everything in
+  the page, so the mask is invisible regardless — which removes the tight timing
+  budget entirely. Only a *refused* switch needs the quick fade-out
+  (`.clearing.fast`, 120ms).
+
+### Measured result
+
+| moment | before | after |
+| --- | --- | --- |
+| desk turns pink | 67% → 100% in one frame | ramps 192→247 over ~155ms |
+| switch lands | ~10ms before cover completed | ~950ms, 90ms clear of the drain |
+| `file://` | wipe + a pointless pink flash | the wipe alone |
+
+LBD 2 came out smooth on the same changes: splat ramp → 70% plateau → 120ms mask
+ramp → cover held ~430ms → drain. Its window is wider than the timeline suggests.
+
+### Verified
+
+Full read-through on `file://` and over `http://localhost` (Vercel serves over
+HTTP, and the fullscreen path only exists there — confirmed
+`fullscreenEnabled: true` and `fullscreenElement: IFRAME`):
+
+- 0 dev hamburger buttons anywhere; reaches page 12 of 12.
+- Both games load (`game-missing` false) and start on Play.
+- **0 mask events on `file://`** — the gate works.
+- No new console errors. The `assets/pages/Page N.mp4` entries in
+  `requestfailed` are the engine **aborting in-flight range requests when it
+  unloads a video on leaving a page** — every one of those files is present on
+  disk. The one genuine miss is LBD 1's own `audio/ready set serve.ogg`,
+  pre-existing and its own bug.
+
+---
+
+## 2026-08-11 — the fullscreen switch: pink before, pink after
 
 Author: still noticeable, make it unnoticeable. It was — and hiding it inside the
 game's wipe was never going to be enough, for a reason that only showed up under

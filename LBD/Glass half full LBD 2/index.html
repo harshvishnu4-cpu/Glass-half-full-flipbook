@@ -137,6 +137,13 @@
        this simply makes Play fullscreen the page, which is no worse.        -->
   <script>
   (function () {
+    // Report in, so the book can tell a LOADED game from a missing one. A frame
+    // whose document 404s still fires `load` and is cross-origin, so the book has
+    // nothing to inspect — silence here is what makes it show its own notice
+    // instead of a blank page.
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ source: 'lbd', type: 'ready' }, '*'); } catch (e) {}
+    }
     var btn = document.getElementById('play-btn');
     if (!btn) return;
 
@@ -144,6 +151,13 @@
       var el = document.documentElement;
       var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
       if (!go || document.fullscreenElement || document.webkitFullscreenElement) return;
+      // Only bother if the switch CAN happen. fullscreenEnabled is false inside a
+      // file:// frame (opaque origin → permission denied) and true over http, so on
+      // a double-clicked book this was asking the book for a full-screen pink mask
+      // that hid nothing — a pink flash across the desk for no gain. Windowed, the
+      // game's own wipe is seamless on its own. (!== false so a browser missing the
+      // property still tries.)
+      if (document.fullscreenEnabled === false) return;
       // Ask the book to paint the same pink over the WHOLE screen first, and WAIT
       // for it to confirm. The wipe only covers this frame; the frame growing from
       // a page-sized box to the screen is plainly visible around it unless
@@ -161,10 +175,17 @@
         var prev = el.style.background;
         el.style.background = '#F77ADE';
         setTimeout(function () { el.style.background = prev; }, 2600);
+        // Report the outcome EITHER WAY so the book clears its pink mask as soon
+        // as the switch has settled, rather than on a fixed timer that outlived a
+        // refused switch and sat over the wipe's reveal.
+        var settled = function () {
+          try { if (window.parent !== window)
+            window.parent.postMessage({ source: 'lbd', type: 'switched' }, '*'); } catch (e2) {}
+        };
         try {
           var p = go.call(el, { navigationUI: 'hide' });
-          if (p && p.catch) p.catch(function () {});   // refused → play windowed
-        } catch (e) {}
+          if (p && p.then) p.then(settled, settled); else settled();
+        } catch (e) { settled(); }
       }
       if (window.parent === window) { go2(); return; } // not framed → nothing to mask
       window.addEventListener('message', function onMsg(ev) {
@@ -173,7 +194,7 @@
         go2();
       });
       try { window.parent.postMessage({ source: 'lbd', type: 'covered' }, '*'); } catch (e) {}
-      setTimeout(go2, 250);                            // no ack → go regardless
+      setTimeout(go2, 700);                              // no ack → go regardless
     }
 
     // SWITCH WHILE THE SPLASH COVERS THE SCREEN, so the resize is never seen.
