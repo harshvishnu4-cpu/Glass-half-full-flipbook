@@ -76,6 +76,37 @@ sampling. `.done` makes the frame pointer-transparent, and a peel completes at
 **15%** (`prog > 0.15`), so a mouse left sitting over the page turns it and looks
 like a product bug. It is not — that cost me a wrong diagnosis.
 
+### The end scene: a new export was intended, but none landed
+
+The author reported adding a new video for the end scene and confirmed they meant
+the **story's last page** (index 11, `assets/pages/Page 10.mp4`). No new file
+arrived: `git status` was clean (nothing untracked anywhere), no commit this
+session **added** a file, and the only change under `assets/` was that one
+`Page 10.mp4` — which decodes to **identical frames**. Whatever was exported
+re-muxed the same edit rather than bringing in a new one.
+
+So the end scene was verified against the file that is actually there, and it is
+working exactly as designed:
+
+| clip time | iris |
+| --- | --- |
+| 0 → 12.52s | dormant (`opacity: 0`, `scale(3.4)` — hides nothing) |
+| ~12.6s | `.closing` goes on, at the configured `at: 12600` |
+| 12.52 → 14.58s | travels `scale(3.4)` → `scale(1)` over the CSS 1500ms |
+| 14.58 → 15.02s | holds the glass spotlit through the last frame |
+
+Then page 11 → 12 turns and THE END renders. Screenshot confirms the black
+surround with the circle centred on the glass.
+
+**Measuring the wrong element first**: `.page-iris` itself is static by design —
+`--isize` is always `40%` and its opacity always `1`. The animation is entirely on
+the inner `<i>` (`scale(3.4)`/`opacity: 0` → `scale(1)`/`opacity: 1`), switched by
+`.page-iris.closing`. Sampling the wrapper made a working iris look frozen.
+
+If a genuinely new export is dropped in, the iris needs re-checking, not
+re-plumbing: `at` is measured from the clip's own clock, and `x`/`y` are the
+glass's centre in the closing frames. A different edit moves all three.
+
 ---
 
 ## 2026-08-11 — the hamburger is gone, and the LBD switch stopped snapping
