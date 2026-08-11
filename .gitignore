@@ -1,3 +1,12 @@
+# ── play-testing harness (test/) ─────────────────────────────────────────────
+# playwright-core is a TEST-ONLY dependency (14MB) and must never ship with the
+# book, which has no build step and no runtime dependencies at all. It drives the
+# Edge already installed on the machine, so no browser is downloaded.
+# Install it with:  cd test && npm install playwright-core
+test/node_modules/
+# Screenshots the play scripts write for eyeballing a run; regenerated every time.
+test/shots/
+
 # ── LBD games ───────────────────────────────────────────────────────────────
 # Dev-only dependencies. Neither game needs node_modules at RUNTIME (LBD 2 loads
 # a vendored js/vendor/gsap.min.js; LBD 1 is a single inline index.html), so 28MB

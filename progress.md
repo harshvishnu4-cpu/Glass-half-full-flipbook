@@ -13,7 +13,77 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — a bug sweep across the book and both games
+## 2026-08-12 (latest) — a reusable play-test suite in `test/`
+
+Every bug found in this project was found by *playing* it in a real browser, but the
+scripts that did it were one-offs in a temp scratchpad — **208 of them**, wiped every
+session, rebuilt from scratch each time. They now live in `test/`, committed.
+
+The book is untouched by this: still **no build step, no runtime dependencies**,
+still works by double-clicking `index.html`. `playwright-core` is installed only
+inside `test/` and gitignored, and downloads no browser — it drives the Edge already
+on the machine.
+
+| command | what it does |
+| --- | --- |
+| `node test/check-media.js` | Safari/iOS codec fallbacks. No browser, ~1s. |
+| `node test/audit.js [--file]` | Missing assets + JS errors, book and both games. |
+| `node test/play-book.js` | All 13 pages, a screenshot each, checks the closing iris. |
+| `node test/play-lbd.js 2 [--wrong] [--throttle 6]` | Plays a game properly, audits its dialogue. |
+| `node test/serve.js` | The server alone, for poking about by hand. |
+
+`audit.js` and `check-media.js` exit non-zero, so either can gate a release.
+`test/README.md` documents the traps each script already avoids;
+`TESTING-PROMPT.md` at the root is the same prompt aimed at a different project.
+
+### New finding: LBD 2 is silent on Safari before 17
+
+`check-media.js` earns its place immediately. **LBD 2 has no Safari/iOS fallbacks
+at all** — 14 audio files `.ogg` only, its end video `.webm` only, and `js/sfx.js`
+hard-codes `.ogg` with no `canPlayType` detection. On an older iPad the game has no
+voice-over and a blank end video, with **nothing in the console** to find later.
+
+LBD 1 already solved exactly this for itself: every clip has an `.m4a`/`.mp4`
+sibling (21/21 covered) and it picks the format once via `MEDIA` / `mediaSrc`. LBD 2
+never got the same treatment. Two files in the book are uncovered too:
+`sfx/pour.ogg` and `assets/audios/This glass is filled all the way up…ogg`.
+
+**Not fixed** — transcoding needs ffmpeg (not on this machine) and the assets are
+the author's call. The fix is to create the siblings, then copy LBD 1's
+`MEDIA`/`mediaSrc` pair into LBD 2. 17 files in total.
+
+### A correction: Range support is not what fixes `Infinity` durations
+
+I had believed a test server ignoring `Range:` was why `<audio>.duration` read
+`Infinity`, and wrote that into `test/serve.js`. Measured properly, it is false: an
+`.ogg` streamed over http reports `Infinity` **with `preload="metadata"` and with
+`preload="auto"` alike**, because Ogg carries no header duration and Chromium will
+not read to the last page for it. Fetched through a `blob:` URL it is exact
+(3.822313s for `vo-ready.ogg`) — which is why both games get real durations at
+runtime: their preloaders hand every clip a blob. `H.clipDuration()` does it the
+right way. `serve.js` still implements Range properly, verified with a 206 response,
+because seeking a `<video>` needs it.
+
+### Two bugs in my own test script, fixed before committing
+
+Worth recording, because a test that lies is worse than no test:
+
+- `play-book.js` reported *"the iris never finished closing"* — a **false failure**.
+  It was checking after the read-through had already turned past that page, so it
+  found an unloaded video. Moved inside the loop; now reports `closed on the glass
+  at t=14.07s of 15.02s`.
+- Pages 4 and 5 printed as `undefined`. Not every page carries `type` — the
+  multi-scene ones are identified by a `scenes` array. Now `scenes(3)` / `scenes(2)`.
+
+### Verified
+
+`audit.js` — clean, 0 missing and 0 JS errors across all three. `play-book.js` — all
+13 pages reachable, iris closes, no errors. `play-lbd.js 2` — full playthrough into
+serving, 7 clips, none cut short, no clip outliving its bubble.
+
+---
+
+## 2026-08-12 — a bug sweep across the book and both games
 
 Two real bugs found and fixed. The reported one — LBD 2 playing a line's audio with
 no dialogue on screen — **could not be reproduced**, and that is recorded honestly
