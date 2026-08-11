@@ -13,7 +13,113 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the Play button has a real click sound
+## 2026-08-11 (latest) — the fullscreen switch is now HIDDEN INSIDE the wipe
+
+Author: the fullscreen switch still looks bad — it should happen *in between* the
+splash transition. Right, and better than what came before it: the previous fix put
+the switch before the transition, which just moved the visible resize onto the title
+screen. Hiding it under a wipe is what a wipe is for.
+
+Both games now: tap → wipe bursts and covers the screen → **switch + start, unseen**
+→ wipe drains, revealing the game already full size.
+
+| | wipe starts | covered | **switch** | game revealed |
+|---|---|---|---|---|
+| LBD 1 | 9ms | 168ms | **750ms** | 2273ms |
+| LBD 2 | 266ms | 961ms | **1209ms** | 2587ms |
+
+### The premise that had to be proved first
+
+Requesting fullscreen ~1.2s after the tap is only legal if the gesture still counts.
+It does — Chromium's transient activation lasts ~5s — and it was measured rather
+than assumed: the switch is granted at 1209ms in LBD 2. Had that failed, the whole
+approach would have been dead, so it was the first thing checked.
+
+### Hooked without touching either game's logic
+
+- **LBD 2** — `splashTransition`'s timeline calls `midFn` at the top, once the juice
+  splat has scaled to 3.8 and swallowed the screen. `midFn` is where `game.js` sets
+  `#title-screen` to `display: none`, so **that mutation IS the covered moment** —
+  a MutationObserver on it fires the switch. `game.js` is untouched.
+- **LBD 1** — had no transition on Play at all (`leaveTitle` hid the title outright:
+  "no shutter — go straight into the game"). But it already owns the pink juice wipe
+  it uses between the tutorial and the customers, so that is reused rather than
+  inventing one, with the timing read from the game's **own `TRANS` table**
+  (`TRANS.BURST + 30`) so the two cannot drift apart.
+
+**⚠ Design change to flag:** LBD 1 now has an opening wipe it did not have before.
+That is the only way to hide a switch in a game with nothing to hide it behind. The
+handler carries a one-line revert in a comment (`start();`) if the instant start is
+preferred.
+
+### Checked where fullscreen is refused
+
+The wipe now gates the start, so a refusal must not strand anyone. In the book on
+`file://` (`fullscreenEnabled: false`) both games still start — LBD 1 at 790ms, LBD 2
+at 1195ms, i.e. on the wipe's own schedule, with the switch simply not happening.
+Nothing waits on a permission that is never coming.
+
+Also fixed a probe that lied: it reported "game revealed" at 114ms, before the splash
+had even started, because `#splash` begins at `display: none` and the check did not
+require having seen it *on* first. Gating it on that produced the real 2587ms.
+
+`git status LBD` shows only the two intended `index.html` changes. Read-through clean.
+
+---
+
+## 2026-08-11 — fullscreen now happens BEFORE the game's opening beat
+
+Author: tapping Play started the transition and *then* went fullscreen, so the
+transition was unnoticeable. Correct — the fullscreen switch resizes the viewport,
+and it was landing on top of an animation that had already begun. Reordered: ask
+for fullscreen, let it settle, *then* start the game.
+
+One correction to the report worth recording: the author said LBD 1, but LBD 1's
+`leaveTitle()` hides the title instantly ("no shutter — go straight into the game")
+— it is **LBD 2** that runs `splashTransition()` on Play. Rather than guess which
+was meant, both were fixed; the reasoning is identical either way.
+
+### Two different fixes, because the two games start differently
+
+- **LBD 1** — `leaveTitle()` fired from an inline `onclick`, i.e. immediately, with
+  no delay to hide behind. Removed the inline handler and sequenced it: request
+  fullscreen, start on `fullscreenchange`, with `start()` idempotent (and
+  `leaveTitle` already guards on `titleDone`, so a race is harmless).
+- **LBD 2** — `game.js` already spends 0.12s squashing the button and a 0.25s
+  `delayedCall` before `splashTransition()`. That is enough runway, so nothing in
+  `game.js` was touched: the request just moved from `click` to **`pointerdown`**,
+  one event earlier. `pointerdown` is activation-triggering, so it still satisfies
+  the gesture requirement. The `click` listener stays for keyboard starts, which
+  produce no `pointerdown`.
+
+Measured over HTTP, where fullscreen actually works:
+
+| | fullscreen at | opening beat at |
+|---|---|---|
+| LBD 1 | 20ms | title hidden **92ms** |
+| LBD 2 | 47ms | splash visible **252ms** |
+
+So in both the resize is finished before the reader is shown anything.
+
+### The regression risk, checked rather than assumed
+
+Waiting for fullscreen could have left the reader on a dead title screen wherever
+it is refused — which is exactly the case inside the book on `file://`. It does not:
+`requestFullscreen()` **rejects immediately** there, `p.catch(start)` fires, and the
+game starts at **18ms**. The 400ms cap is insurance that never bites in practice.
+Standalone on `file://` the game gets real fullscreen anyway (a top-level document
+is allowed — only the iframe is refused), starting at 45ms.
+
+A test file was briefly written into `LBD/Glass half full LBD 2/` by a `cd` that ran
+inside a backgrounded subshell. Deleted; `git status LBD` now shows only the two
+intended `index.html` changes. Worth remembering that `cd X && cmd &` backgrounds
+the whole compound, so the parent shell never changes directory.
+
+Read-through clean; both games still load lazily and unload on leaving.
+
+---
+
+## 2026-08-11 — the Play button has a real click sound
 
 Author added `sfx/play click (1).mp3`. It now plays when the Play button is tapped,
 replacing the synthesized pop that stood in for it.

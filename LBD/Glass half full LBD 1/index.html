@@ -1279,7 +1279,9 @@ body {
   <!-- ── title screen (only the Play button starts the game) ── -->
   <div id="title">
     <img id="titleImg" src="new assets/game thumbnail 9 (1).webp" alt="The Glass Half Full">
-    <img class="playBtn" id="playBtn" src="assets map/start-button.webp" alt="Play" onclick="leaveTitle()">
+    <!-- No inline onclick: the start is sequenced AFTER the fullscreen switch, at
+         the bottom of this file. leaveTitle() is still the one entry point. -->
+    <img class="playBtn" id="playBtn" src="assets map/start-button.webp" alt="Play">
     <!-- boot progress bar: sits where Play will appear, removed once everything is fetched -->
     <div id="loadWrap" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="loadTrack"><div id="loadFill"></div></div>
@@ -4793,14 +4795,46 @@ initRound();
 (function () {
   var btn = document.getElementById('playBtn');
   if (!btn) return;
-  btn.addEventListener('click', function () {
+
+  // SWITCH TO FULLSCREEN WHILE THE SCREEN IS COVERED, so the resize is never seen.
+  // Doing it on the tap meant watching the viewport jump; doing it under a wipe
+  // hides it, which is what a wipe is for.
+  //
+  // This game had no transition on Play — leaveTitle() hid the title outright
+  // ("no shutter — go straight into the game"). It DOES already own the pink
+  // juice-splash wipe it uses between the tutorial and the customers, so that is
+  // reused here rather than inventing anything: burst → (covered) switch + start →
+  // drain reveals the game, now full size.
+  // ⚠ This adds an opening wipe the game did not have. To go back to the old
+  //    instant start, replace the body of the handler below with `start();`.
+  //
+  // Timings come from the game's own TRANS table, so they cannot drift apart:
+  // BURST is when the splat has swallowed the board, DRAIN_AT when it starts
+  // clearing. The switch goes just after BURST, inside that covered window.
+  var COVERED = (typeof TRANS === 'object' && TRANS && TRANS.BURST) ? TRANS.BURST + 30 : 730;
+
+  var started = false;
+  function start() {                    // fullscreen, then hand over to the game
+    if (started) return;
+    started = true;
     var el = document.documentElement;
     var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-    if (!go || document.fullscreenElement || document.webkitFullscreenElement) return;
-    try {
-      var p = go.call(el, { navigationUI: 'hide' });
-      if (p && p.catch) p.catch(function () {});   // refused → play windowed
-    } catch (e) {}
+    var already = document.fullscreenElement || document.webkitFullscreenElement;
+    if (go && !already) {
+      try {
+        var p = go.call(el, { navigationUI: 'hide' });
+        if (p && p.catch) p.catch(function () {});   // refused → carry on windowed
+      } catch (e) {}
+    }
+    leaveTitle();                       // idempotent: guards on titleDone
+  }
+
+  btn.addEventListener('click', function () {
+    if (started) return;
+    // Nothing to hide behind if the wipe is unavailable — just go.
+    if (typeof playSplashTransition !== 'function') { start(); return; }
+    playSplashTransition();
+    setTimeout(start, COVERED);
   });
 })();
 </script>
