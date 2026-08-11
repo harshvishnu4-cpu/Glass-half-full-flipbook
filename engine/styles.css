@@ -249,16 +249,12 @@
     72%      { opacity: 1;   transform: scale(1.10);
                filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 14px rgba(246,184,30,0.8)); }
   }
-  /* One-shot 2s blink + GOLD GLOW played ONCE when a page's video fully ends
-     (a "turn the page" cue). Pulses opacity AND a gold glow around the arrow. */
-  .corner-arrow.blink1 { animation: arrowBlink1 2s ease-in-out 1; }
-  @keyframes arrowBlink1 {
-    0%, 100% { opacity: 0.95; filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 6px  rgba(246,184,30,0.55)); }
-    25%, 75% { opacity: 0.3;  filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 3px  rgba(246,184,30,0.25)); }
-    50%      { opacity: 1;    filter: drop-shadow(0 2px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 18px rgba(246,184,30,1)); }
-  }
+  /* (A second arrow animation, .blink1, used to fire its own 2s one-shot the
+     instant a clip ended, two seconds before the hand appeared. Removed: the
+     page-complete cue is now the single .blink above, started in the same tick
+     as the hand and the peel.) */
   @media (prefers-reduced-motion: reduce) {
-    .flip-hint.show, .corner-arrow.blink, .corner-arrow.blink1 { animation: none; }
+    .flip-hint.show, .corner-arrow.blink { animation: none; }
   }
 
   /* ==========================================================================

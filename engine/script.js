@@ -130,10 +130,9 @@ function makeMedia(page) {
       const p = media.play(); if (p && p.catch) p.catch(function () {});
     });
     // When THIS page's video FULLY finishes, the reader is TOLD they may turn:
-    // the corner arrow fades in (dialogueDone → updateProgress) and blinks +
-    // gold-glows for 2s, and the hand nudge on the page corner starts 2s later.
-    // The blink fires ONCE per page arrival (armBlink) so a short clip won't
-    // blink repeatedly, and is skipped on the last page.
+    // the corner arrow fades in (dialogueDone → updateProgress) and, a short
+    // breath later, ONE cue guides them — the arrow's gold glow, the hand on the
+    // page corner and the ghost page-peel, all on the same 1.5s beat.
     media.addEventListener("ended", function () {
       hideSoundHint(media);                    // a muted clip that ends takes its hint with it
       if (!opened || !ready) return;
@@ -143,8 +142,8 @@ function makeMedia(page) {
       if (pages[flipped] && pages[flipped].scenes) {
         // …except on a SCENES page, where the page isn't finished until its LAST
         // scene ends — the scene player owns that call (seqDone → dialogueDone).
-        // Bail out on the earlier clips, or they'd burn this page's one blink
-        // (armBlink) at a moment when the arrow is still hidden.
+        // Bail out on the earlier clips, or an intermediate scene would report
+        // the page finished while the story still has scenes to play.
         const layer = media.closest(".page-scene");
         const layers = leaves[flipped].querySelectorAll(".page-scene");
         if (!layer || layer !== layers[layers.length - 1]) return;
@@ -152,13 +151,12 @@ function makeMedia(page) {
         videoWatched[flipped] = true;            // seen in full → never re-gate it
         dialogueDone(flipped);
       }
-      if (flipped >= totalPages - 1) return;     // last page → nothing to turn to
-      if (!armBlink || !cornerNext) return;      // already blinked for this visit
-      armBlink = false;                          // one blink per page arrival
-      cornerNext.classList.remove("blink1");
-      void cornerNext.offsetWidth;               // restart the animation cleanly
-      cornerNext.classList.add("blink1");
-      setTimeout(function () { cornerNext.classList.remove("blink1"); }, 2050);
+      // NOTE: the arrow used to flash its own 2s one-shot (.blink1) right here,
+      // 9ms after the clip ended, while the hand nudge only arrived 2044ms later
+      // — two guidance cues, one after the other, reading as out of sync. The
+      // page-complete cue is now ONE thing: dialogueDone() above schedules the
+      // whole nudge (arrow glow + hand + page peel, all on the shared 1.5s beat)
+      // so they arrive together.
     });
   } else {
     media.decoding = "async";
@@ -1168,8 +1166,7 @@ let mediaDelayIdx = -1;       // which page that pending timer belongs to
 // killed peel tween, a tab backgrounded mid-flip) — a page must never be left
 // sitting on a frozen first frame. Slightly past the flip so it loses the race.
 const TURN_HOLD_MS = FLIP_MS + 60;
-let lastMediaIdx = -1;        // last page refreshMedia handled (to arm the blink once)
-let armBlink = false;         // allow the video-end arrow blink ONCE per page arrival
+let lastMediaIdx = -1;        // last page refreshMedia handled (arrival vs re-assert)
 
 /* Start (or resume) a page's clip. `restart` distinguishes a fresh ARRIVAL on the
    page from the idempotent re-asserts refreshMedia() makes several times per turn
@@ -1522,7 +1519,7 @@ function playScenes(idx, startDelay) {
     } else {
       // LAST scene of the page: signal once its dialogue has fully played out
       // (typing done / video ended / narrator hold over) → the page-turn nudge
-      // may arm (it waits HINT_AFTER_DONE_MS more, see dialogueDone).
+      // may arm (it waits CUE_AFTER_DONE_MS more, see dialogueDone).
       const seqDone = function () {
         if (run !== scenePlayRun || scenePlayPage !== idx) return;   // stale
         sceneSeqDone = idx;                    // remember: this page has played out
@@ -1593,7 +1590,7 @@ function refreshMedia() {
   // per turn? Only an arrival may replay a clip that has already finished.
   const arrived = (idx !== lastMediaIdx);
   if (arrived) {
-    lastMediaIdx = idx; armBlink = true;       // arm the video-end blink once per page
+    lastMediaIdx = idx;                        // this page is now the current one
     hintDoneFor = -1;                          // fresh page → nudge waits for its scenes again
     hideSoundHint(null);                       // the muted-clip rescue belongs to the page we left
     if (idx >= totalPages - 1) duckMusic(false);   // no narration on THE END — music carries it
@@ -1924,7 +1921,7 @@ function closeBookToCover(afterReset) {
   clearTimeout(_homeTimer);
   hideFlipHint(); cancelPeek(); clearTimeout(idleHintTimer); clearTimeout(nudgeHideTimer);
   stopTurnCue();
-  if (cornerNext) cornerNext.classList.remove("blink", "blink1");
+  if (cornerNext) cornerNext.classList.remove("blink");
   var v = currentVideo(); if (v) { try { v.pause(); } catch (_) {} }
   flipbookEl.style.pointerEvents = "none";
   tapCatcher.style.pointerEvents = "none";
@@ -2471,9 +2468,17 @@ document.body.appendChild(flipHint);
 
 // Guidance timing: the nudge NEVER interrupts a scene — it appears only after
 // the page's dialogue/scene sequence has fully finished (dialogueDone below),
-// waits HINT_AFTER_DONE_MS more, then plays. It repeats every NUDGE_GAP_MS
-// until the reader turns the page; any interaction resets it.
-const HINT_AFTER_DONE_MS = 2000;  // breathing room after the scene completes
+// waits a breath, then plays. It repeats every NUDGE_GAP_MS until the reader
+// turns the page; any interaction resets it.
+// TWO different breaths, and the difference matters:
+//   • after the PAGE COMPLETES the cue should arrive promptly — it is the
+//     answer to "what now?". This used to be 2000ms while the arrow flashed its
+//     own separate one-shot 9ms after the clip ended, so the reader got the
+//     arrow first and the hand two seconds later; they read as unrelated.
+//   • after the reader TOUCHES something, nudging again 0.7s later would be
+//     pestering, so that path waits considerably longer.
+const CUE_AFTER_DONE_MS  = 700;   // page finished → arrow + hand + peel, together
+const CUE_AFTER_TOUCH_MS = 2500;  // reader interacted → leave them alone a while
 // The three parts of the nudge share ONE beat: the hand's swipe keyframes are
 // 1.5s, the ghost peel is 0.70 + 0.15 + 0.60 = 1.45s, and the arrow's glow now
 // matches at 1.5s. Keep NUDGE_SHOW_MS a whole multiple of the beat or the cue
@@ -2496,7 +2501,7 @@ function dialogueDone(idx) {
   updateProgress();                          // un-grey the corner arrows
   clearTimeout(idleHintTimer);
   clearTimeout(nudgeHideTimer);
-  idleHintTimer = setTimeout(triggerHint, HINT_AFTER_DONE_MS);
+  idleHintTimer = setTimeout(triggerHint, CUE_AFTER_DONE_MS);
 }
 
 function canShowHint() {
@@ -2594,15 +2599,11 @@ function triggerHint() {
   if (!canShowHint()) { idleHintTimer = setTimeout(triggerHint, NUDGE_GAP_MS); return; }
   showFlipHint();
   peekFlip();
-  if (cornerNext) {
-    // The end-of-video one-shot (.blink1, 2s) is still on the arrow for the
-    // last ~50ms of its life when the nudge fires at HINT_AFTER_DONE_MS, and it
-    // is declared after .blink at the same specificity — so it WINS the
-    // `animation` property and holds the synced glow off for those 50ms, which
-    // then lags the hand by 50ms for the rest of the cue. Drop it first.
-    cornerNext.classList.remove("blink1");
-    cornerNext.classList.add("blink");
-  }
+  // The arrow's glow starts in the SAME tick as the hand and the peel, so all
+  // three share a phase as well as a period. (There used to be a second arrow
+  // animation, .blink1, that had to be stripped here because it outranked this
+  // one in the cascade; it is gone — completion now fires only this cue.)
+  if (cornerNext) cornerNext.classList.add("blink");
   // The hand and the arrow loop on their own; the peel is one-shot, so re-fire
   // it on the second beat or that beat would be missing the page lift the other
   // two are timed against. Parked in peekTimers so any interaction cancels it.
@@ -2625,7 +2626,7 @@ function resetIdleHint() {
   // Re-arm ONLY if this page's dialogue has already finished — otherwise the
   // nudge stays quiet until dialogueDone() fires for the page.
   if (hintDoneFor === flipped) {
-    idleHintTimer = setTimeout(triggerHint, HINT_AFTER_DONE_MS + 500);
+    idleHintTimer = setTimeout(triggerHint, CUE_AFTER_TOUCH_MS);
   }
 }
 // Any interaction cancels the nudge + restarts the idle countdown.

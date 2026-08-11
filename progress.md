@@ -13,7 +13,56 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-10 (latest) — the book-drop thud is gone
+## 2026-08-11 (latest) — the arrow and the hand now guide together
+
+Author: the arrow and hand nudge are not in sync; on completion they should come
+together. Measured before touching anything, on page 1:
+
+    12675ms  clip ENDED
+    12684ms  → arrow-visible, blink1     (  9ms after the clip)
+    14728ms  → arrow-visible, blink, hand (2053ms after the clip)
+    → GAP 2044ms
+
+So there were **two separate guidance cues**: the arrow fired its own 2s one-shot
+(`.blink1`) 9ms after the clip ended, and the nudge — hand + arrow glow + ghost
+peel — only arrived two seconds later. The earlier sync work put the *nudge's*
+three parts on one beat, which they still are; it never touched this, because the
+clash is between the nudge and a cue that runs before it.
+
+**`.blink1` is gone.** Page completion now fires exactly one thing: `dialogueDone`
+schedules the whole nudge, so the arrow's glow, the hand and the peel all start in
+the same tick. Removed with it: the `armBlink` "one blink per arrival" flag it
+existed to gate, the `arrowBlink1` keyframes, and the `remove("blink1")` that
+`triggerHint` needed because `.blink1` outranked `.blink` in the cascade — a whole
+little subsystem that only existed to manage a second cue.
+
+**One breath became two, because they are different questions:**
+
+- `CUE_AFTER_DONE_MS` **700ms** — the page has finished and the reader is asking
+  "what now?", so the answer should be prompt. (Was 2000ms.)
+- `CUE_AFTER_TOUCH_MS` **2500ms** — after the reader touches something, nudging
+  again 0.7s later would be pestering. This path used to inherit the same constant
+  (`+ 500`), and collapsing them to one number would have made the re-nudge feel
+  like nagging.
+
+Verified: the gap is **0ms** — arrow, hand and peel all start at the same
+millisecond (0ms spread across all three), 730ms after the clip ends. They remain
+in phase within their shared 1.5s beat (hand holds furthest-left 641–1143ms, arrow
+holds full glow 690–1116ms, midpoints 11ms apart, one flare per swipe). After a
+touch the nudge waits 2574ms. Reduced motion still silences it. Read-through clean.
+
+### `sfx/BG Music.mp3` disappeared for the THIRD time
+
+Deleted again from the working tree (folder mtime minutes old) while `story.js`
+still references it, so the book logged `load fail: BG Music.mp3` and played
+silent. Restored from git again — but three times in two days is a pattern, not an
+accident. If the 9.4MB file is being cleaned up deliberately, the fix is to drop
+the `music:` line in story.js rather than leave a reference to a file that is not
+there; if it is not deliberate, something in the workflow is removing it.
+
+---
+
+## 2026-08-10 — the book-drop thud is gone
 
 Author: remove the book drop sound. The whole `<script>` at the bottom of `<body>`
 is gone, so the landing is silent.
