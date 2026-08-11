@@ -683,7 +683,12 @@ pages.forEach(function (page, i) {
     fr.className = "page-game";
     fr.title = page.title || "Game";
     fr.dataset.src = encodeURI(page.src);
+    // `fullscreen` lets the game escape this page-sized frame when its own Play
+    // button asks — the request has to come from inside the frame (that is where
+    // the gesture is), and without this permission the browser refuses it.
+    // `allowfullscreen` is the legacy spelling, kept for older engines.
     fr.setAttribute("allow", "autoplay; fullscreen");
+    fr.setAttribute("allowfullscreen", "");
     front.appendChild(fr);
   } else if (page.scenes) {
     // MULTI-SCENE page: the storyboard screens stack as full-bleed layers and

@@ -123,6 +123,33 @@
   <script src="js/preload-manifest.js"></script>
   <script src="js/preload.js"></script>
   <script src="js/game.js"></script>
+
+  <!-- ── GO FULLSCREEN ON PLAY ─────────────────────────────────────────────────
+       The flipbook hosts this game in an iframe the size of one book page, which
+       is a small window for a drag-and-drop game. Tapping Play now asks for
+       fullscreen so it fills the screen instead.
+       It has to be requested HERE, from inside the game: the request needs the
+       user gesture in the document that makes it, and a click in this iframe
+       never reaches the book. The book's side is `allow="fullscreen"`.
+       A SEPARATE listener, deliberately — game.js's own #play-btn handler is
+       untouched, so if fullscreen is refused (iOS Safari does not allow it on a
+       non-video element) the game still starts exactly as before. Standalone,
+       this simply makes Play fullscreen the page, which is no worse.        -->
+  <script>
+  (function () {
+    var btn = document.getElementById('play-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var el = document.documentElement;
+      var go = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (!go || document.fullscreenElement || document.webkitFullscreenElement) return;
+      try {
+        var p = go.call(el, { navigationUI: 'hide' });
+        if (p && p.catch) p.catch(function () {});   // refused → play windowed
+      } catch (e) {}
+    });
+  })();
+  </script>
 </body>
 </html>
 

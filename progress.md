@@ -13,7 +13,59 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-11 (latest) — the games' 404 fixed: they were never committed
+## 2026-08-11 (latest) — tapping Play in a game takes it FULLSCREEN
+
+Author: in the LBD games, tapping Play should open the game fullscreen. A book page
+is a small window for a game, especially a drag-and-drop one.
+
+**The request has to come from inside the game.** `requestFullscreen()` needs the
+user gesture in the document that calls it, and a click inside the iframe never
+reaches the book — the same isolation that stops the book stealing the game's
+drags. So the book grants the permission and each game asks.
+
+- Book side: the iframe gets `allow="autoplay; fullscreen"` plus the legacy
+  `allowfullscreen`.
+- Game side: a **separate** click listener on each Play button — `#playBtn` in
+  LBD 1, `#play-btn` in LBD 2 — requesting fullscreen on its own
+  `documentElement`, with the promise rejection swallowed. Deliberately separate
+  so neither game's own handler is touched: if fullscreen is refused, the game
+  starts exactly as before. Verified both still start.
+
+### The check that mattered, and what it found
+
+`document.fullscreenEnabled` inside the frame is the one thing that fails silently.
+On `file://` it came back **false** — and my first instinct, that fullscreen is
+simply blocked for `file://` pages, was wrong: the **top** document there reports
+`true`. It is specifically the *iframe*, which on `file://` gets an opaque origin
+that Chromium will not delegate the permission to.
+
+Re-tested over HTTP, which is how the book actually ships — a throwaway static
+server on 127.0.0.1:
+
+| | top document | inside the game frame | real Play tap |
+|---|---|---|---|
+| `file://` | `true` | **`false`** | no transition |
+| `http://` | `true` | **`true`** | `fullscreenchange` fired, `fullscreenElement = HTML` |
+
+So **hosted, it works end to end**. Double-clicked from disk it does not, because
+the browser will not give a `file://` iframe the permission — the game just starts
+windowed, which is why the rejection is caught rather than reported.
+
+Worth noting how nearly this shipped as "done": a stubbed `requestFullscreen` proved
+only that the call was *made*, and it happily passed while the browser was refusing
+it. Checking the permission and the `fullscreenchange` event is what separated
+"asked" from "happened".
+
+If fullscreen in the double-clicked case ever matters, the alternative is a
+`postMessage` from the game on start and the book CSS-expanding the iframe to the
+viewport — no permission needed, works on `file://`, but it is not true fullscreen.
+
+Read-through clean; the only error remains game 1's own missing
+`ready set serve.ogg`.
+
+---
+
+## 2026-08-11 — the games' 404 fixed: they were never committed
 
 Author: the games 404. Confirmed the cause in one command rather than guessing —
 what commit `41e0986` actually recorded for `LBD/`:
