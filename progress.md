@@ -13,7 +13,59 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — the new Page 2, and re-reading a page
+## 2026-08-12 (latest) — the new Page 10, and the hint no longer leaks the next page
+
+### The ghost peel was giving the next page away
+
+The nudge's ghost peel lifts the bottom-right corner to show that the page turns.
+Lifting it **clips** the current sheet (`renderPeel` sets a `clip-path`), so whatever
+sits beneath shows through the gap — and beneath is the next page, fully rendered.
+Captured it: while still reading page 1, **page 2's lit pumpkin was plainly visible
+under the fold**. The hint was spoiling the next scene.
+
+The next sheet is now veiled for the duration of the hint (`.peek-veil`): its
+contents are hidden and its face keeps only the plain paper gradient, so the lift
+uncovers a **blank** page. The gesture reads exactly as before. A real drag-turn is
+untouched — there, seeing the next page is the whole point.
+
+Every exit path removes the veil (peel complete, reader interrupts, page turned),
+because a sheet left veiled would render blank when the reader actually got to it.
+Verified all three: veiled during the peel, clear after the cue, clear after an
+interrupting tap, and the page turned to shows its content normally.
+
+### Page 10's new export: two seconds longer, so the iris was retuned twice
+
+Same footage with about two more seconds of the held glass appended — frames at
+12.6s are pixel-identical to the previous file (control 51.53), same audio peak,
+and the only RMS difference is at 14.50s, past where the old clip ended. Duration
+**15.022s → 17.009s**.
+
+- **`at` 12600 → 14600.** Left alone, the circle closed at 14.1s and then sat
+  spotlit for nearly 3.5s — a long dark hold. 14600 keeps the original
+  relationship: closed near the end, about half a second of held spotlight.
+- **`y` 49% → 62%, `x` 49% → 49.5%.** This export does not zoom in as far as the
+  old one. Measured at the closing frames, the juice centroid is now
+  **50.5% / 66.9%**, spanning y 45.9–84.4%, so the glass centres near y 62%. The old
+  clip pushed the zoom much further (its juice spanned y 0–83.7%), which is why 49%
+  framed it then and **clipped the glass now** — the circle ended at 535px while the
+  glass reached 567px, cutting its base off. Confirmed on screen before and after.
+
+`size` stays 40%: ≈452px against a glass ~282px wide and ~353px tall.
+
+This is the second replaced clip in a row where the *duration* changed, which is the
+thing that silently breaks a timed effect. Any replaced clip on a page carrying an
+`iris`, `hold`, `delay` or `tap.after` needs its numbers re-measured, not assumed.
+
+### Still to confirm with the author
+
+The new clip was described as "an end screen of the book". It is already the last
+story page, and page 12 is still the generated "The End" card with the replay
+button. Whether that card should now go — leaving the held glass as the final
+screen — is a content decision, so it has been left in place.
+
+---
+
+## 2026-08-12 — the new Page 2, and re-reading a page
 
 ### Page 2's replaced export: the AUDIO changed, nothing else
 

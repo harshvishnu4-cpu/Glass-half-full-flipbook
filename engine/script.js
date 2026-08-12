@@ -2930,9 +2930,25 @@ function hideFlipHint() {
    Lift the current page about halfway toward the next one, then let it fall back
    — a live demo that the page turns. Purely visual; cancelled the instant the
    reader interacts, so a real drag/flip takes over cleanly. */
+/* The ghost peel clips the current sheet, so the NEXT page shows through the gap
+   it opens — the hint was giving the next scene away. Veil that sheet while the
+   hint runs so the lift uncovers a blank page instead (see .peek-veil in the CSS).
+   Only ever applied to the leaf directly beneath, and always taken off again: a
+   sheet left veiled would render blank when the reader actually turned to it. */
+let veiledLeaf = null;
+function setPeekVeil(on) {
+  if (veiledLeaf) { veiledLeaf.classList.remove("peek-veil"); veiledLeaf = null; }
+  if (!on) return;
+  const nxt = leaves[flipped + 1];
+  if (!nxt) return;
+  nxt.classList.add("peek-veil");
+  veiledLeaf = nxt;
+}
+
 function cancelPeek() {
   peekTimers.forEach(clearTimeout);
   peekTimers = [];
+  setPeekVeil(false);
   if (!peeking) return;
   peeking = false;
   const leaf = leaves[flipped];
@@ -2951,6 +2967,7 @@ function peekFlip() {
   const leaf = leaves[flipped];
   if (!leaf) return;
   peeking = true;
+  setPeekVeil(true);                                     // don't let the hint leak the next page
   const curl = leaf.querySelector(".curl");
   leaf.style.zIndex = 300;                               // lift above the rest while peeking
   if (G) {
@@ -2966,6 +2983,7 @@ function peekFlip() {
         leaf._peekTl = null;
         peelEnd(leaf);
         leaf.style.zIndex = "";
+        setPeekVeil(false);                              // the next page is real again
         peeking = false; updateZ();
       }
     });
@@ -2991,6 +3009,7 @@ function peekFlip() {
   }, 850));                                              // 700 lift + 150 hold
   peekTimers.push(setTimeout(function () {               // clean up once settled
     leaf.style.transition = ""; leaf.style.transform = ""; leaf.style.zIndex = "";
+    setPeekVeil(false);                                  // the next page is real again
     peeking = false; updateZ();
   }, 1450));                                             // …clear of the 1500ms beat
 }

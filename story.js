@@ -231,14 +231,31 @@ window.STORY = {
 
     // The last story page: the clip zooms into the full glass, then an IRIS
     // closes the page to black around it and holds it spotlit — the closing beat
-    // before THE END. `at` is measured from the clip's own clock: the zoom has
-    // arrived by ~12.6s of its 15.02s, so the circle finishes closing with the
-    // last frame. x/y are the glass's centre in the closing frames (measured:
-    // the juice's centroid settles at 49.2% / 49.3%); size is the settled
-    // circle's diameter as a % of the page width, comfortably around the glass
-    // (which is ~23% wide and ~56% tall).
-    { type: "video", src: "assets/pages/Page 10.mp4",     // 15s
-      iris: { at: 12600, x: "49%", y: "49%", size: "40%" } },
+    // before THE END. `at` is measured from the clip's own clock, and the circle
+    // takes 1500ms to close (the .page-iris i transition), so `at` is set to land
+    // that finish just under a second before the last frame.
+    //
+    // RETUNED for the 2026-08-12 export, which runs 17.009s where the previous one
+    // ran 15.022s — the same footage with about two more seconds of the held glass
+    // on the end (verified: frames at 12.6s are pixel-identical to the old file,
+    // against a control of 51.53). Left at 12600 the circle would have closed at
+    // 14.1s and then sat spotlit for nearly 3.5s, a long dark hold. 14600 keeps
+    // the ORIGINAL relationship exactly: closed at ~16.1s, held ~0.9s, done with
+    // the last frame — the same 922ms tail the old timing had.
+    //
+    // x/y RETUNED too, because this export does not zoom in as far as the old one
+    // did. Measured off the closing frames: the juice's centroid is now
+    // 50.5% / 66.9% and it spans y 45.9-84.4%, so the glass (rim above the juice,
+    // base below) centres near y 62%. The old clip pushed the zoom much further —
+    // its juice spanned y 0-83.7% at its closing moment — which is why y 49% framed
+    // it then and cuts the glass off now: at 49% the circle ended at y 535px while
+    // the glass reached 567px, so its base was clipped. 62% contains it (165-617px
+    // against a glass of 214-567px).
+    // size is the settled circle's diameter as a % of the page WIDTH: 40% ≈ 452px
+    // against a glass ~282px wide and ~353px tall, so it still sits comfortably
+    // clear on every side.
+    { type: "video", src: "assets/pages/Page 10.mp4",     // 17.009s
+      iris: { at: 14600, x: "49.5%", y: "62%", size: "40%" } },
 
     { type: "end" },   // ← keep this last: the closing "The End" page
   ]
