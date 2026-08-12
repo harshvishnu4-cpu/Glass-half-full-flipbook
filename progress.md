@@ -29,20 +29,33 @@ and the peel reveals the real next page again, confirmed on a captured frame (pa
 styles.css saying it was tried and why it was removed, so it does not get
 "fixed" back in.
 
-### The iris was arriving far too late
+### The iris is now timed to the ZOOM, not to the clip's end
 
-`at: 14600` closed the circle at 16.48s of a 17.009s clip — the spotlit glass was
-held for **0.53s**. That number came from preserving the *old* export's ~0.9s tail,
-which was the wrong thing to preserve: with two extra seconds of footage the whole
-closing beat had gone by before the reader saw it.
+Three passes to get this right, and the author's reasoning is what settled it: the
+iris exists to *focus attention on the glass*, so it should close **with** the camera
+pushing in — not once the push has already finished.
 
-Now `at: 12600` — the earliest the circle can close and still land on the glass.
-Closes at **14.36s**, holding the glass spotlit for **2.65s**. The long hold is the
-ending, so earlier is better here.
+| `at` | circle closes | held spotlit | verdict |
+| --- | --- | --- | --- |
+| 14600 | 16.48s | 0.53s | far too late — the beat was over before it was seen |
+| 12600 | 14.36s | 2.65s | still waited for the zoom to finish first |
+| **10000** | **11.5s** | **5.5s** | closes as the zoom starts, which is the point |
 
-Why 12600 is the floor: the zoom-in arrives at ~12.5s and the glass then holds the
-same position to the last frame; before that it is smaller and lower and a circle
-fixed at y 62% would not contain it.
+Found the zoom by tracking the glass's width as a share of the frame:
+
+| clip time | glass width |
+| --- | --- |
+| 10.0s | 7.5% ← the push-in begins |
+| 10.5s | 8.8% |
+| 11.0s | 10.4% |
+| 12.0s | 18.8% |
+| 12.5s | 20.4% ← arrived |
+| 14.6s+ | 19–20%, held to the last frame |
+
+Verified frame by frame: dormant at 9.85s (`scale(3.4)`, opacity 0), closing by
+10.67s (scale 1.92), fully closed at 11.56s with the spotlight on the still-small
+glass while the camera keeps pushing, and by 12.5s the glass has grown to fill the
+circle — rim to base, steam rising out of the top. Held from there to 17.0s.
 
 **A measurement trap worth recording:** a colour-based scan of the juice makes the
 13–14s stretch look wildly unstable (the pink was reported spanning x 32.9–95.4%,

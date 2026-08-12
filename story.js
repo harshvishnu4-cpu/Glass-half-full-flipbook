@@ -235,18 +235,24 @@ window.STORY = {
     // takes 1500ms to close (the .page-iris i transition), so `at` is set to land
     // that finish just under a second before the last frame.
     //
-    // 12600 is the EARLIEST the circle can close and still land on the glass: the
-    // clip's zoom-in arrives at ~12.5s and the glass holds the same position from
-    // there to the last frame. So the circle finishes closing at ~14.1s and the
-    // glass is held spotlit for ~2.9s of the 17.009s clip.
-    // It was briefly set to 14600 to preserve the old export's ~0.9s tail, which
-    // made the iris arrive far too late — almost the whole closing beat was gone
-    // before the reader saw it. Earlier is better here; the long hold IS the ending.
-    // (Do not push it below ~12500: before that the zoom is still travelling, the
-    // glass is smaller and lower, and a circle fixed at y 62% would not contain it.
-    // The 13-14s stretch LOOKS unstable to a colour-based measurement because a
-    // purple smoke plume rises out of the glass there — the glass itself does not
-    // move, so that stretch is safe.)
+    // TIMED TO THE ZOOM, because the iris exists to focus attention on the glass —
+    // so it should close WITH the camera pushing in, not after it has arrived.
+    // Measured on this export by tracking the glass's width as a share of the frame:
+    //   10.0s   7.5% wide   ← the push-in begins
+    //   10.5s   8.8%
+    //   11.0s  10.4%
+    //   12.0s  18.8%
+    //   12.5s  20.4%        ← arrived
+    //   14.6s+ 19-20%       held to the last frame
+    // So `at: 10000` starts the circle closing exactly as the zoom starts; it is
+    // fully closed at ~11.5s and the glass then grows into the spotlight as the
+    // camera finishes its push, settling at 12.5s and held to the end.
+    // History, so it is not "corrected" backwards: 14600 (closed 16.5s, only 0.53s
+    // of held spotlight) was far too late, and 12600 (closed 14.4s) still waited for
+    // the zoom to finish before starting.
+    // Note for anyone re-measuring: a colour scan of the juice reads as wildly
+    // unstable from 13s on, because a purple smoke plume rises out of the glass and
+    // gets counted. The glass itself does not move after 12.5s. Look at the frame.
     //
     // x/y RETUNED too, because this export does not zoom in as far as the old one
     // did. Measured off the closing frames: the juice's centroid is now
@@ -260,7 +266,7 @@ window.STORY = {
     // against a glass ~282px wide and ~353px tall, so it still sits comfortably
     // clear on every side.
     { type: "video", src: "assets/pages/Page 10.mp4",     // 17.009s
-      iris: { at: 12600, x: "49.5%", y: "62%", size: "40%" } },
+      iris: { at: 10000, x: "49.5%", y: "62%", size: "40%" } },
 
     { type: "end" },   // ← keep this last: the closing "The End" page
   ]
