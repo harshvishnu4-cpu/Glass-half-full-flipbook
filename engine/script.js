@@ -1821,6 +1821,7 @@ function refreshMedia() {
   if (arrived) {
     lastMediaIdx = idx;                        // this page is now the current one
     hintDoneFor = -1;                          // fresh page → nudge waits for its scenes again
+    arrowReadyFor = -1;                        // …and so does the forward arrow
     hideSoundHint(null);                       // the muted-clip rescue belongs to the page we left
     if (idx >= totalPages - 1) duckMusic(false);   // no narration on THE END — music carries it
   }
@@ -1971,9 +1972,20 @@ function refreshMedia() {
       if (mediaGate) {
         if (videoWatched[idx]) dialogueDone(idx); else armTurnCue(pv, idx);
       }
-    } else if (!bub && cur) {
+    } else if (!bub && cur && !(pages[idx] && pages[idx].type === "game")) {
       dialogueDone(idx);                       // no dialogue at all (e.g. THE END)
     }
+    // A GAME page is excluded from that branch deliberately. It has no bubble and
+    // no video, so it used to fall in here and be marked finished the instant the
+    // reader arrived — the forward arrow appeared at once and the game could be
+    // turned straight past without ever being played. (Measured: on page 8, three
+    // seconds after arriving, the arrow was visible and enabled, and the arrow,
+    // goNext() and a corner drag all turned the page.) That branch was written for
+    // THE END, which really has nothing to wait for; game pages inherited it by
+    // accident when they were added. A game now finishes the only way it should —
+    // by reporting `end`, which is what calls dialogueDone for it (see
+    // returnFromGame). The BACK arrow stays available throughout, so a reader who
+    // does not want to play can still leave the page.
   }
   // Right-side page stack shrinks toward the end: 3 sheets → … → 0 on the last page.
   if (pageStackEl) pageStackEl.dataset.count = String(Math.max(0, Math.min(3, totalPages - 1 - flipped)));
@@ -2035,7 +2047,10 @@ function updateProgress() {
   // have fully played out (dialogueDone() re-runs this), then fades in.
   const dlgDone = hintDoneFor === flipped;
   const showPrev = opened && ready && flipped > 0;
-  const showNext = opened && ready && dlgDone && flipped < totalPages - 1;
+  // NEXT waits for arrowReadyFor, not merely dlgDone, so it arrives WITH the hand
+  // and the flare instead of ~600ms ahead of them.
+  const showNext = opened && ready && dlgDone && arrowReadyFor === flipped &&
+                   flipped < totalPages - 1;
   if (cornerPrev) {
     cornerPrev.classList.toggle("hide", !showPrev);
     cornerPrev.disabled = !showPrev;
@@ -2151,6 +2166,7 @@ function resetToStart() {
   // Fresh dialogue for the next read-through: stop the scene player and put
   // every bubble / scene sequence back to its start.
   hintDoneFor = -1;                            // nudge re-gates on the next read
+  arrowReadyFor = -1;                          // …and the forward arrow with it
   for (var k in videoWatched) delete videoWatched[k];   // every page is unwatched again
   stopScenes();
   leaves.forEach(function (leaf, i) {
@@ -2794,6 +2810,17 @@ const NUDGE_GAP_MS  = 9000;    // gap after it disappears before it plays again
 let idleHintTimer = null;
 let nudgeHideTimer = null;
 let hintDoneFor = -1;          // page index whose dialogue has fully played out
+/* Page index whose forward ARROW has been revealed. Separate from hintDoneFor
+   because the arrow used to appear the instant the page finished while the hand
+   and the flare followed CUE_AFTER_DONE_MS later — measured at 585-625ms apart on
+   every page. CUE_AFTER_DONE_MS's own comment says the three arrive "together",
+   so the code disagreed with its stated intent, and the arrow popping in on its
+   own read as a separate event from the nudge that follows it.
+   Set on the same timer that fires the nudge, but OUTSIDE canShowHint() — a game
+   page holds the nudge back until the game ends, and gating the arrow on that too
+   would leave the reader with no way forward. */
+let arrowReadyFor = -1;
+let arrowRevealTimer = null;   // deliberately NOT cleared by resetIdleHint
 let peeking = false;
 let peekTimers = [];
 
@@ -2802,20 +2829,37 @@ let peekTimers = [];
 function dialogueDone(idx) {
   if (idx !== flipped) return;               // stale — we've left that page
   hintDoneFor = idx;
-  updateProgress();                          // un-grey the corner arrows
+  updateProgress();                          // BACK arrow etc.; NEXT waits for the cue
   clearTimeout(idleHintTimer);
   clearTimeout(nudgeHideTimer);
-  idleHintTimer = setTimeout(triggerHint, CUE_AFTER_DONE_MS);
+  // ONE moment for all four: the arrow appears as the hand swipes, the arrow
+  // flares and the page peels. Two timers on the SAME delay rather than one, so
+  // they land in the same tick but can be cancelled independently — because
+  // resetIdleHint clears idleHintTimer on every tap, and the arrow must not be
+  // postponed by that. A child tapping the screen would otherwise push the arrow
+  // 2.5s further away with each tap and might never be offered it at all.
+  // Net effect: idle reader → all four together, which is when guidance matters;
+  // tapping reader → the arrow still arrives on time, the nudge waits for a lull.
+  clearTimeout(arrowRevealTimer);
+  arrowRevealTimer = setTimeout(function () {
+    arrowReadyFor = idx;
+    updateProgress();                        // the arrow fades in…
+  }, CUE_AFTER_DONE_MS);
+  idleHintTimer = setTimeout(triggerHint, CUE_AFTER_DONE_MS);   // …as the hand starts
 }
 
 function canShowHint() {
   // On a GAME page, only once the game has ENDED. While it is being played,
   // pointer events inside the iframe never reach this document, so the idle timer
   // is never reset and the nudge would fire over the game — the ghost peel lifting
-  // the very page in use. The corner arrow is available throughout regardless, so
-  // nobody is trapped; the cue is held back until the game says it is finished
+  // the very page in use. The cue is held back until the game says it is finished
   // (see the `lbd` message handler), which is exactly when the invitation to turn
   // on is welcome rather than an interruption.
+  // The forward arrow is not available meanwhile either: it needs hintDoneFor,
+  // which on a game page is set only when the game reports `end` (see
+  // returnFromGame, and the `type === "game"` exclusion in refreshMedia that makes
+  // this true). So a game must be FINISHED before the page can be turned forward.
+  // The BACK arrow is unaffected, so a reader who does not want to play can leave.
   if (pages[flipped] && pages[flipped].type === "game" && !gameDone[flipped]) return false;
   return opened && ready && !animating &&
          hintDoneFor === flipped &&          // never before the scene completes
@@ -2890,24 +2934,41 @@ function peekFlip() {
       .to(proxy, { t: 0,    duration: 0.6, ease: "power2.inOut", delay: 0.15 });
     return;
   }
-  leaf.style.transition = "transform 720ms cubic-bezier(0.33, 0, 0.2, 1)";
+  // Timed to match the GSAP peel above EXACTLY — 700 lift + 150 hold + 600 down =
+  // 1450ms, the beat the hand and the arrow are built around. It used to run
+  // 720/760/1520, which put `peeking = false` 20ms AFTER triggerHint re-fires
+  // peekFlip for the second beat (at NUDGE_BEAT_MS = 1500). peekFlip bails while
+  // `peeking` is true, so in the no-GSAP fallback the second beat silently lost
+  // its page lift — the one thing that re-fire exists to provide.
+  leaf.style.transition = "transform 700ms cubic-bezier(0.33, 0, 0.2, 1)";
   void leaf.offsetWidth;                                 // commit so the lift animates from flat
   leaf.style.transform = "rotateY(-52deg)";              // turn toward the next page (~halfway)
   if (curl) curl.style.opacity = "0.85";                 // page-curl shading during the lift
   peekTimers.push(setTimeout(function () {               // ...then ease it back down
+    leaf.style.transition = "transform 600ms cubic-bezier(0.33, 0, 0.2, 1)";
     leaf.style.transform = "rotateY(0deg)";
     if (curl) curl.style.opacity = "";
-  }, 760));
+  }, 850));                                              // 700 lift + 150 hold
   peekTimers.push(setTimeout(function () {               // clean up once settled
     leaf.style.transition = ""; leaf.style.transform = ""; leaf.style.zIndex = "";
     peeking = false; updateZ();
-  }, 760 + 760));
+  }, 1450));                                             // …clear of the 1500ms beat
 }
 
 // Play the nudge — hand swipe on the book's right + ghost page-flip + the right
 // arrow flaring gold, ALL STARTED IN THE SAME TICK so they share phase, for two
 // beats; then hide and come back 9s later. Repeats while idle.
 function triggerHint() {
+  // Reveal the forward arrow whenever the cue is DUE — not only from the timer in
+  // dialogueDone. A reader who taps during that 700ms beat sends resetIdleHint
+  // here instead, and without this the arrow would never appear on the page at all.
+  // Before canShowHint() deliberately: a held-back nudge (a game still in play)
+  // must not also hold back the arrow. It still needs hintDoneFor, so a game page
+  // reveals nothing until the game reports that it ended.
+  if (hintDoneFor === flipped && arrowReadyFor !== flipped) {
+    arrowReadyFor = flipped;
+    updateProgress();
+  }
   if (!canShowHint()) { idleHintTimer = setTimeout(triggerHint, NUDGE_GAP_MS); return; }
   showFlipHint();
   peekFlip();

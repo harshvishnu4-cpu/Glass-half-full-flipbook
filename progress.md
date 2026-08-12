@@ -13,7 +13,80 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — a reusable play-test suite in `test/`
+## 2026-08-12 (latest) — the turn cue: three real bugs in the nudge and arrow
+
+Audited the whole cue by watching it play with **nothing forced** — the arrow, the
+hand, the flare and the ghost peel sampled at 25ms on every page, then the taps a
+reader would make driven for real. Three genuine bugs, and one thing the audit
+proved is *not* broken.
+
+### 1. The arrow arrived ~600ms before the nudge
+
+`CUE_AFTER_DONE_MS`'s own comment reads *"page finished → arrow + hand + peel,
+**together**"* — but the code did not do that. `dialogueDone` revealed the arrow
+immediately and then scheduled the hand, the flare and the peel 700ms later.
+Measured on four pages: **585, 625, 601, 624ms apart**. The flare and the hand were
+already perfectly synced (0ms, from the earlier fix); it was the arrow's plain
+*arrival* that ran ahead, so the reader saw two separate events.
+
+Fixed with `arrowReadyFor`, a second gate on the forward arrow set on the same
+delay that fires the nudge. Now measured **0ms / 0ms / 0ms** — arrow, flare and
+hand are one event on every page.
+
+Two traps handled while doing it, both found by testing rather than reasoning:
+
+- The arrow gets its **own timer** (`arrowRevealTimer`) that `resetIdleHint` does
+  *not* clear. Sharing the nudge's timer meant a tap during the 700ms beat pushed
+  the arrow out to `CUE_AFTER_TOUCH_MS` (measured: 2508ms) — and a child tapping
+  repeatedly could postpone it indefinitely and never be offered a way on. Now:
+  idle reader → all three together; tapping reader → the arrow still arrives on
+  time (measured 843ms) and only the nudge waits for a lull.
+- `arrowReadyFor` is set **before** `canShowHint()` in `triggerHint`, so a nudge
+  held back for an unfinished game does not also withhold the arrow.
+
+### 2. A game could be turned straight past without being played
+
+`refreshMedia`'s *"no dialogue at all (e.g. THE END)"* branch fires for any page
+with no bubble and no video. That was written for THE END — but a **game page has
+neither**, so it inherited the branch when games were added and was marked finished
+the instant the reader arrived. Measured on page 8, three seconds after landing:
+the forward arrow visible and enabled, and **the arrow, `goNext()` and a corner
+drag all turned the page** with the game untouched. The `gameDone` gate added
+earlier only ever held back the nudge, never the arrow or the turn.
+
+Game pages are now excluded from that branch, so a game finishes the only way it
+should — by reporting `end`. Verified: all three routes now leave the page at 8,
+and finishing the game still hands it back (`end → endDone → left → arrow → 8→9`).
+The BACK arrow is untouched, so nobody is stuck on a game they cannot win.
+
+### 3. The second beat's page-lift was silently lost without GSAP
+
+The nudge plays two beats and re-fires `peekFlip` on the second, because the peel
+is one-shot. `peekFlip` bails while `peeking` is true. The GSAP peel runs
+0.7 + 0.15 + 0.6 = **1450ms**, comfortably clear of the 1500ms beat — but the
+no-GSAP fallback ran 720/760/**1520ms**, clearing `peeking` 20ms *after* the
+re-fire. So in the fallback the second beat lost the one thing that re-fire exists
+to provide. Retimed to 700 + 150 + 600 = 1450ms, matching the GSAP path exactly.
+
+### Not broken, despite looking it
+
+- The nudge **does** repeat while idle — instrumented at exactly 9001ms after it
+  hides, indefinitely. An earlier reading suggested it never repeated; that was my
+  watch window ending before page 1's real completion (its video runs ~15s).
+- The interaction hand (`.scene-tap-hand`) and the corner flip hand never appear
+  together. An apparent clash on page 4 was my probe querying the whole document
+  and finding tap-hands on *other* leaves, off-screen but computing as visible.
+  Scope cue probes to the current leaf.
+
+### Consequence for testing
+
+An automated read-through can no longer click past the game pages — reaching page
+12 now requires actually playing both games. That is correct, but it means a
+full-book script has to play them or start after them.
+
+---
+
+## 2026-08-12 — a reusable play-test suite in `test/`
 
 Every bug found in this project was found by *playing* it in a real browser, but the
 scripts that did it were one-offs in a temp scratchpad — **208 of them**, wiped every
