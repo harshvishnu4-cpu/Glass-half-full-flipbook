@@ -1791,6 +1791,19 @@ let turnCueTimer = null, turnCueIdx = -1;
 // reader to sit through it a second time, so its cue is available immediately
 // (the clip still replays from the top). Cleared by resetToStart for a fresh read.
 const videoWatched = Object.create(null);
+/* Pages whose page-turn cue has already played once this read. Going BACK to one
+   of them is a re-read, not a first read, so it is treated differently:
+     • both corner arrows are offered the moment the page arrives — the reader has
+       already sat through this page once and should not be made to wait again, nor
+       watch the clip a second time to earn the forward arrow;
+     • and the page-flip nudge does NOT play. A hand swiping the corner of a page
+       the reader has deliberately turned BACK to is telling them to do the thing
+       they just chose not to do. (Interaction nudges — the tapping hand, the POUR
+       hint — are untouched: those are how a scenes page is played at all.)
+   Cleared with videoWatched when the book closes, so every fresh read is fully
+   gated again. */
+const pageRead = Object.create(null);
+let revisiting = false;         // is the page we are ON one we have already read?
 function armTurnCue(v, idx) {
   if (turnCueIdx === idx && turnCueTimer) return;          // already watching this page
   stopTurnCue();
@@ -1822,6 +1835,19 @@ function refreshMedia() {
     lastMediaIdx = idx;                        // this page is now the current one
     hintDoneFor = -1;                          // fresh page → nudge waits for its scenes again
     arrowReadyFor = -1;                        // …and so does the forward arrow
+    revisiting = !!pageRead[idx];
+    if (revisiting) {
+      // Already read once: open the gate NOW. Both arrows show immediately (see
+      // pageRead) and no nudge will play, because canShowHint() checks this too.
+      // Done here rather than in dialogueDone so it holds for a SCENES page as
+      // well — those only report finished when their last scene ends, and a
+      // re-reader should not have to sit through the scenes again to get an arrow.
+      hintDoneFor = idx;
+      arrowReadyFor = idx;
+      clearTimeout(idleHintTimer);
+      clearTimeout(nudgeHideTimer);
+      clearTimeout(arrowRevealTimer);
+    }
     hideSoundHint(null);                       // the muted-clip rescue belongs to the page we left
     if (idx >= totalPages - 1) duckMusic(false);   // no narration on THE END — music carries it
   }
@@ -2168,6 +2194,8 @@ function resetToStart() {
   hintDoneFor = -1;                            // nudge re-gates on the next read
   arrowReadyFor = -1;                          // …and the forward arrow with it
   for (var k in videoWatched) delete videoWatched[k];   // every page is unwatched again
+  for (var pk in pageRead) delete pageRead[pk];         // …and unread, so the nudge returns
+  revisiting = false;
   stopScenes();
   leaves.forEach(function (leaf, i) {
     leaf.querySelectorAll(".bubble").forEach(resetBubble);
@@ -2829,6 +2857,17 @@ let peekTimers = [];
 function dialogueDone(idx) {
   if (idx !== flipped) return;               // stale — we've left that page
   hintDoneFor = idx;
+  if (revisiting) {
+    // A re-read. The arrows were already offered when the page arrived; all that
+    // is left is to make sure no nudge gets scheduled when the clip ends again.
+    arrowReadyFor = idx;
+    updateProgress();
+    clearTimeout(idleHintTimer);
+    clearTimeout(nudgeHideTimer);
+    clearTimeout(arrowRevealTimer);
+    return;
+  }
+  pageRead[idx] = true;                      // first read done → a return is a re-read
   updateProgress();                          // BACK arrow etc.; NEXT waits for the cue
   clearTimeout(idleHintTimer);
   clearTimeout(nudgeHideTimer);
@@ -2860,6 +2899,7 @@ function canShowHint() {
   // returnFromGame, and the `type === "game"` exclusion in refreshMedia that makes
   // this true). So a game must be FINISHED before the page can be turned forward.
   // The BACK arrow is unaffected, so a reader who does not want to play can leave.
+  if (revisiting) return false;              // a re-read gets the arrows, not a hand
   if (pages[flipped] && pages[flipped].type === "game" && !gameDone[flipped]) return false;
   return opened && ready && !animating &&
          hintDoneFor === flipped &&          // never before the scene completes

@@ -13,7 +13,71 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — the turn cue: three real bugs in the nudge and arrow
+## 2026-08-12 (latest) — the new Page 2, and re-reading a page
+
+### Page 2's replaced export: the AUDIO changed, nothing else
+
+Checked the way every replaced clip is: **17.441s and 1920×1080, identical to the
+previous file**, and frames sampled at 0.5 / 3 / 6 / 9 / 12 / 15 / 17.1s are
+pixel-identical — against a control of **42.03** for a genuinely different clip
+(Page 3), so the method is sound. The first control I tried scored only 3.73
+comparing two moments of Page 2 itself, which is far too weak to prove anything;
+worth remembering that a control has to be something that *must* differ.
+
+Decoding the audio found the real change: same duration, rate, channels and peak
+(0.3949), but the per-250ms RMS differs, **biggest at 4.00s**. So it is a
+re-recorded line, not a re-encode. Same as the previous Page 2 replacement.
+
+Nothing to integrate. Page 2 has no `iris`, `hold` or `delay`, its length is
+unchanged, so every timing that depends on it still lands. `story.js` still says
+"17s", which is right.
+
+### "The nudge and arrow should come when the whole video completes"
+
+Already true on a **first** read, and now measured against every clip's real
+duration rather than assumed:
+
+| page | clip | duration | cue fired | vs clip end + 700ms |
+| --- | --- | --- | --- | --- |
+| 1 | Page 2 | 17.441s | 18114ms | −27ms |
+| 2 | Page 3 | 23.538s | 24216ms | −22ms |
+| 3 | Page 4 | 16.136s | 16779ms | −57ms |
+| 6 | Page 7 | 8.197s | 8952ms | +55ms |
+| 9 | Page 9 | 30.680s | 31331ms | −49ms |
+| 11 | Page 10 | 15.022s | 15666ms | −56ms |
+
+Page 0 is the exception at +1172ms, which is the book-open animation delaying the
+clip's start, not the cue firing late.
+
+What actually looked wrong was the **re-read** case: returning to a page fired the
+cue instantly (`videoWatched[idx] → dialogueDone(idx)` on arrival), so the nudge
+appeared with no clip having played — which reads exactly like "the nudge came
+before the video finished".
+
+### Re-reading a page now behaves differently, on purpose
+
+New `pageRead` map, and a `revisiting` flag set when a page arrives:
+
+- **Both arrows immediately.** A re-reader is not made to sit through the clip
+  again to earn the forward arrow. Set at ARRIVAL rather than in `dialogueDone`, so
+  it holds for a scenes page too — those only report finished when their last scene
+  ends, and a re-reader should not have to replay the scenes for an arrow.
+- **No page-flip nudge.** `canShowHint()` returns false while revisiting. A hand
+  swiping the corner of a page the reader has deliberately turned BACK to is
+  telling them to undo the thing they just chose to do.
+- Interaction nudges (the tapping hand, the POUR hint) are untouched — those are
+  how a scenes page is played at all.
+- `pageRead` clears with `videoWatched` when the book closes, so every fresh read
+  is fully gated again.
+
+Verified: first reads of pages 0–2 still cue at 12698 / 17979 / 24116ms (the whole
+clip), then going back to pages 2 and 1 shows `back=yes next=yes` immediately with
+**no hand, no flare and no peel across 12 seconds** of watching. Pages 0–7 still
+clean on a first read, and the game gate still holds.
+
+---
+
+## 2026-08-12 — the turn cue: three real bugs in the nudge and arrow
 
 Audited the whole cue by watching it play with **nothing forced** — the arrow, the
 hand, the flare and the ghost peel sampled at 25ms on every page, then the taps a
