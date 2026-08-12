@@ -13,46 +13,66 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — the new Page 10, and the hint no longer leaks the next page
+## 2026-08-12 (latest) — the iris comes earlier, and the peel reveals the page again
 
-### The ghost peel was giving the next page away
+### A misread, and the revert
 
-The nudge's ghost peel lifts the bottom-right corner to show that the page turns.
-Lifting it **clips** the current sheet (`renderPeel` sets a `clip-path`), so whatever
-sits beneath shows through the gap — and beneath is the next page, fully rendered.
-Captured it: while still reading page 1, **page 2's lit pumpkin was plainly visible
-under the fold**. The hint was spoiling the next scene.
+"when nudge came with peel animation show the next page" was a **request** — the
+peel should reveal the next page, as lifting a real page does. I read it as a bug
+report that the hint was leaking the next scene, and veiled the sheet beneath so the
+fold uncovered blank paper. That paper is `var(--paper)`, #1e2750, which is what
+"only blue colour" was.
 
-The next sheet is now veiled for the duration of the hint (`.peek-veil`): its
-contents are hidden and its face keeps only the plain paper gradient, so the lift
-uncovers a **blank** page. The gesture reads exactly as before. A real drag-turn is
-untouched — there, seeing the next page is the whole point.
+The veil is gone — CSS rules, the `setPeekVeil` helper and all three call sites —
+and the peel reveals the real next page again, confirmed on a captured frame (page
+2's lit pumpkin visible under the fold while reading page 1). A note is left in
+styles.css saying it was tried and why it was removed, so it does not get
+"fixed" back in.
 
-Every exit path removes the veil (peel complete, reader interrupts, page turned),
-because a sheet left veiled would render blank when the reader actually got to it.
-Verified all three: veiled during the peel, clear after the cue, clear after an
-interrupting tap, and the page turned to shows its content normally.
+### The iris was arriving far too late
 
-### Page 10's new export: two seconds longer, so the iris was retuned twice
+`at: 14600` closed the circle at 16.48s of a 17.009s clip — the spotlit glass was
+held for **0.53s**. That number came from preserving the *old* export's ~0.9s tail,
+which was the wrong thing to preserve: with two extra seconds of footage the whole
+closing beat had gone by before the reader saw it.
 
-Same footage with about two more seconds of the held glass appended — frames at
-12.6s are pixel-identical to the previous file (control 51.53), same audio peak,
-and the only RMS difference is at 14.50s, past where the old clip ended. Duration
-**15.022s → 17.009s**.
+Now `at: 12600` — the earliest the circle can close and still land on the glass.
+Closes at **14.36s**, holding the glass spotlit for **2.65s**. The long hold is the
+ending, so earlier is better here.
 
-- **`at` 12600 → 14600.** Left alone, the circle closed at 14.1s and then sat
-  spotlit for nearly 3.5s — a long dark hold. 14600 keeps the original
-  relationship: closed near the end, about half a second of held spotlight.
-- **`y` 49% → 62%, `x` 49% → 49.5%.** This export does not zoom in as far as the
-  old one. Measured at the closing frames, the juice centroid is now
-  **50.5% / 66.9%**, spanning y 45.9–84.4%, so the glass centres near y 62%. The old
-  clip pushed the zoom much further (its juice spanned y 0–83.7%), which is why 49%
-  framed it then and **clipped the glass now** — the circle ended at 535px while the
-  glass reached 567px, cutting its base off. Confirmed on screen before and after.
+Why 12600 is the floor: the zoom-in arrives at ~12.5s and the glass then holds the
+same position to the last frame; before that it is smaller and lower and a circle
+fixed at y 62% would not contain it.
 
-`size` stays 40%: ≈452px against a glass ~282px wide and ~353px tall.
+**A measurement trap worth recording:** a colour-based scan of the juice makes the
+13–14s stretch look wildly unstable (the pink was reported spanning x 32.9–95.4%,
+centroid jumping to y 33%), which nearly ruled out any earlier timing. Looking at
+the actual frame showed why — a **purple smoke plume** rises out of the glass there
+and the filter counted it. The glass itself never moves. Always look at the frame
+before trusting a colour statistic.
 
-This is the second replaced clip in a row where the *duration* changed, which is the
+### Page 10's new export: the geometry still needed retuning
+
+Same footage with ~2s more of the held glass — frames at 12.6s pixel-identical to
+the previous file (control 51.53), same audio peak, RMS differing only at 14.50s,
+past where the old clip ended. Duration **15.022s → 17.009s**.
+
+`y` 49% → 62% (and `x` → 49.5%) stays, and is the real fix for the framing: this
+export does not zoom as far as the old one, so at 49% the circle ended at 535px
+while the glass reached 567px and **its base was cut off**. Measured at the closing
+frames the juice centroid is 50.5% / 66.9%, spanning y 45.9–84.4%, so the glass
+centres near y 62%. `size` stays 40% (≈452px against a glass ~282 × 353px).
+
+Two replaced clips in a row have changed *duration*, which is what silently breaks a
+timed effect. A replacement on any page carrying `iris`, `hold`, `delay` or
+`tap.after` needs its numbers re-measured, not assumed.
+
+### Still to confirm with the author
+
+The new clip was described as "an end screen of the book". It is already the last
+story page, and page 12 is still the generated "The End" card with the replay
+button. Whether that card should now go is a content decision, so it stays.
+
 thing that silently breaks a timed effect. Any replaced clip on a page carrying an
 `iris`, `hold`, `delay` or `tap.after` needs its numbers re-measured, not assumed.
 

@@ -970,21 +970,13 @@
   }
   .peel-fold { position: absolute; inset: 0; }
 
-  /* ---- GHOST-PEEL VEIL ------------------------------------------------------
-     The nudge's ghost peel lifts the bottom-right corner to show that the page
-     turns. Lifting it CLIPS the current sheet, so whatever sits beneath shows
-     through — and beneath is the NEXT page, fully rendered. The hint was giving
-     the next scene away before the reader had turned to it (measured: page 2's
-     lit pumpkin plainly visible under the fold while still reading page 1).
-     So while the ghost peel is running, the next sheet is veiled: its contents
-     are hidden and the face keeps only its plain paper gradient, so the lift
-     uncovers a BLANK page. The gesture still reads exactly the same.
-     A REAL drag-turn is untouched — there, seeing the next page is the whole
-     point. Only the hint veils. */
-  .leaf.peek-veil > .face.front {
-    background: linear-gradient(135deg, var(--paper), var(--paper-2));
-  }
-  .leaf.peek-veil > .face.front > * { visibility: hidden; }
+  /* NOTE — there is deliberately NO veil on the sheet beneath during the ghost
+     peel. It was tried (a .peek-veil class that hid the next page's contents so the
+     lift uncovered blank paper) on the reading that the hint was spoiling the next
+     scene. The author's intent was the opposite: the peel SHOULD reveal the next
+     page, exactly as lifting a real page does. Veiling it meant the fold uncovered
+     flat navy — var(--paper), #1e2750 — which is what "only blue colour" was.
+     So the reveal is the real next page, and nothing here interferes with it. */
 
   /* JS-driven shadow the TURNING sheet casts on the page beneath it — used by
      the NO-GSAP fallback drag only (the peel has its own fold shadows). Hinged
