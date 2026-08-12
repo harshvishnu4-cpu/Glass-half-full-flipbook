@@ -414,9 +414,6 @@ function buildPourScene(layer, cfg) {
   layer.innerHTML =
     '<img class="pour-bg" alt="" draggable="false" src="' + encodeURI(cfg.bg || "") + '">' +
     '<img class="pour-machine" alt="" draggable="false" style="' + at(cfg.machineAt, "27%") + '" src="' + encodeURI(cfg.machine || "") + '">' +
-    '<div class="pour-stream" style="left:' + (st.x || "50%") + ";top:" + (st.top || "60%") +
-        ";height:" + (st.h || "8%") + ';background:linear-gradient(180deg,' +
-        juice + '00 0%,' + juice + ' 22%,' + juice + ' 100%)"></div>' +
     '<svg class="pour-glass" style="' + at(cfg.glassAt, "6%") + '" viewBox="0 0 114 169.613" aria-hidden="true">' +
       '<defs><clipPath id="' + uid + 'clip">' +
         '<rect class="pour-level" x="0" y="0" width="114" height="169.613" style="transform:translateY(' + BOT_Y + 'px)"/>' +
@@ -439,6 +436,18 @@ function buildPourScene(layer, cfg) {
       '<path class="pour-mouth-juice" d="' + CUP_MOUTH + '" fill="' +
         shade(juice, 0.9) + '" style="opacity:0"/>' +
     '</svg>' +
+    // THE STREAM, painted AFTER the glass. It used to sit before it, on the note
+    // that it should tuck "behind the rim" — but this cup is not translucent art:
+    // the SVG paints CUP_BACK, CUP_FRONT, CUP_RIM and CUP_MOUTH as solid fills, so
+    // being underneath hid the stream behind the WHOLE cup. Measured: the stream
+    // ran to y 512 while the cup's top was y 500, so its last 12px were buried and
+    // it appeared to stop dead at the rim — the juice looked like it fell BEHIND
+    // the glass and the liquid rose with nothing connecting it to the spout.
+    // On top, the stream visibly crosses the rim and ends inside the mouth, which
+    // is what pouring in looks like. `dip` is how far past the mouth it reaches.
+    '<div class="pour-stream" style="left:' + (st.x || "50%") + ";top:" + (st.top || "60%") +
+        ";height:" + (st.h || "8%") + ';background:linear-gradient(180deg,' +
+        juice + '00 0%,' + juice + ' 22%,' + juice + ' 100%)"></div>' +
     '<button class="pour-btn" type="button" disabled aria-label="Pour the juice" ' +
         'style="' + at(cfg.buttonAt, "6%") + '">' +
       '<img alt="" draggable="false" src="' + encodeURI(cfg.button || "") + '">' +

@@ -13,7 +13,52 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — the iris comes earlier, and the peel reveals the page again
+## 2026-08-12 (latest) — the poured juice fell BEHIND the glass
+
+Reported as "the pouring juice falling behind the glass not in the glass", and that
+is exactly what it was — not an alignment drift but a paint-order bug.
+
+The stream is a `<div>` that sat **before** `.pour-glass` in the DOM, on the note that
+it should tuck "behind the rim". But the glass is not translucent artwork: the SVG
+fills `CUP_BACK`, `CUP_FRONT`, `CUP_RIM` and `CUP_MOUTH` as solid paths. Sitting
+underneath meant being hidden behind the **whole cup**, not just the rim. Measured:
+the stream ran to y 512 while the cup's top edge was y 500, so its last 12px were
+buried and it appeared to stop dead at the rim — the liquid then rose in the glass
+with nothing connecting it to the spout.
+
+Two changes, both needed:
+
+- **Paint order** — the stream div moved to after the glass SVG, so it is visible
+  crossing the rim into the mouth.
+- **`stream.h` 8.5% → 19%** — at 8.5% it still only reached the rim (bottom y 512
+  against a mouth at y 500–509). At 19% it carries from the spout down into the
+  juice: bottom y 579, inside a glass that ends at y 605, so it never overshoots.
+
+Verified by zooming 3× on the spout-to-glass region through a full four-tap fill:
+the stream lands in the liquid at every level (its lower part merging with juice of
+the same colour once the level is high), it stays inside the glass, and the glass
+still reaches `.full` so the page unlocks.
+
+Worth noting how this was found: the geometry numbers alone looked fine — the stream
+was centred on the glass and overlapped its mouth by 12px. Only the zoomed picture
+showed the overlap was **behind** the cup rather than in front of it.
+
+### The Page 6 export never landed
+
+Reported as updated, but the file on disk is **byte-for-byte identical** to the
+committed one — same SHA256 `85d2d42c…`, same 3,495,290 bytes, git reporting no
+change, only the mtime moved. So it was the same file copied over itself.
+
+Flagged for when the real one arrives, because Page 6 is the highest-stakes
+replacement in the book: the POUR scene's `machineAt` / `buttonAt` / `glassAt` /
+`stream` were template-matched against **that clip's final frame** so the
+cross-dissolve into the interactive machine is invisible. An earlier set was 5.8% too
+far right, 3.8% too low and 6% too small and the machine visibly jumped. Any change
+to the clip's framing means re-measuring all of them.
+
+---
+
+## 2026-08-12 — the iris comes earlier, and the peel reveals the page again
 
 ### A misread, and the revert
 

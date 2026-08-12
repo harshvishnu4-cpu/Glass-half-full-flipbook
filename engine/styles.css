@@ -1205,9 +1205,13 @@
     filter: saturate(0.8) brightness(0.9); opacity: 0.85;
   }
   .pour-scene .pour-btn:focus, .pour-scene .pour-btn:focus-visible { outline: none; }
-  /* THE STREAM — skinny gradient from the spout into the glass mouth; one-shot
-     fade-in / hold / fade-out per tap, restarted via the reflow trick. Sits
-     UNDER the glass in the DOM so its tail tucks behind the rim. */
+  /* THE STREAM — skinny gradient from the spout down into the juice; one-shot
+     fade-in / hold / fade-out per tap, restarted via the reflow trick.
+     It is painted AFTER the glass in the DOM, not before. It used to sit before it
+     so its tail would "tuck behind the rim", but this cup is not translucent art —
+     the SVG fills CUP_BACK, CUP_FRONT, CUP_RIM and CUP_MOUTH solid — so underneath
+     meant hidden behind the WHOLE cup, and the juice looked like it fell behind the
+     glass instead of into it. */
   .pour-scene .pour-stream {
     position: absolute; width: 0.6%;
     transform: translateX(-50%);

@@ -173,7 +173,15 @@ window.STORY = {
             machineAt: { x: "30.75%", y: "7.75%",  w: "28.50%" },
             buttonAt:  { x: "41.65%", y: "48.39%", w: "6.14%"  },
             glassAt:   { x: "41.88%", y: "65.71%", w: "6.31%"  },
-            stream: { x: "45%", top: "59.21%", h: "8.5%" },
+            // h was 8.5%, which ended the stream at the glass's rim (measured: it
+            // stopped at y 512 with the cup's mouth at y 500-509). Combined with the
+            // stream being painted UNDER the cup, the juice appeared to fall BEHIND
+            // the glass and the liquid rose with nothing joining it to the spout.
+            // 19% carries it from the spout down INTO the juice — bottom at y 579,
+            // inside the glass, which ends at y 605, so it never overshoots. At
+            // higher fill levels its lower part simply merges with the liquid, which
+            // is the same colour. (The paint-order half of the fix is in script.js.)
+            stream: { x: "45%", top: "59.21%", h: "19%" },
             juice: "#F27FBE",
             taps: 4,
             // "Tap the button to pour juice." — spoken as the scene arrives, and
