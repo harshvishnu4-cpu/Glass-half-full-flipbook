@@ -81,9 +81,16 @@
               (withPour ? " + pour" : withTap ? " + tap" : ""),
       };
     }
+    var label = "Page " + (i + 1);
+    // A GAME page's src is always ".../index.html", which says nothing about WHICH
+    // game it is — and knowing that is the main reason to jump to one. story.js
+    // gives each a title, so use that, trimmed of its " — game" suffix.
+    if (page.type === "game") {
+      var t = (page.title || "game").replace(/\s*—\s*game\s*$/i, "");
+      return { label: label, note: "🎮 " + t };
+    }
     var src = page.src || (page.scenes && page.scenes[0] && page.scenes[0].src) || "";
     var file = src.split("/").pop().replace(/\.(mp4|webm|png|jpe?g|webp)$/i, "");
-    var label = "Page " + (i + 1);
     // only show the filename when it tells you something the label doesn't
     return { label: label, note: file.toLowerCase() === label.toLowerCase() ? "" : file };
   }

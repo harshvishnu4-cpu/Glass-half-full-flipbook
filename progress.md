@@ -13,7 +13,53 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — LBD 1's fresh glass inflated instead of dropping in
+## 2026-08-13 (latest) — the page-jump menu is back, for testing
+
+Re-enabled the dev hamburger that was removed on 2026-08-11. Everything it needs
+was still on disk in `dev/` (kept inert precisely so it could come back), so this
+was one `<script>` line in `index.html` plus a verification pass.
+
+**Removal is still one folder and one line** — `dev/README.md` spells it out, and
+the comment above the script tag repeats it. Nothing in `engine/`, `story.js` or the
+CSS refers to it, and it refuses to start if `window.STORY` is absent.
+
+### It survived the engine changes made while it was gone
+
+Worth checking, because two of them could have broken it:
+
+- **Games can no longer be turned past** (they must report `end`). The menu's jump
+  calls the engine's own `dialogueDone(at)` before each forward hop, which sets
+  `hintDoneFor` and satisfies `goNext()` for *any* page type — so a jump straight to
+  page 12, past **both** games, still works. Verified.
+- **`arrowReadyFor` / `revisiting`** likewise do not gate `goNext()`, so hopping is
+  unaffected.
+
+### Verified against every requirement
+
+| | |
+| --- | --- |
+| top-left | button at (14, 14), 44×44, `position: fixed` |
+| lists every page | 14 rows — cover + 13 pages |
+| marks the current page | `aria-current="true"` — cover on load, the landing row after a jump |
+| closes when a page is picked | yes |
+| closes on an outside click | yes |
+| closes on Esc | yes (extra) |
+| jump past both games | page 11 reached |
+| JS errors / 404s | none |
+
+**Note for future testing:** the active row is marked with `aria-current`, not a
+class. My first check looked for `.active`/`.current` class names and reported "no
+active page" on a menu that was working correctly.
+
+### One improvement while it was open
+
+Game rows showed their `src`, which is always `index.html` — useless for telling the
+two games apart, which is the main reason to jump to one. They now show the title
+from `story.js`: **🎮 Pour the juice** and **🎮 Sort and serve**.
+
+---
+
+## 2026-08-12 — LBD 1's fresh glass inflated instead of dropping in
 
 Reported as "the glass pop for few second and its looking akward", narrowed with the
 author to the **fresh glass that appears in the machine after a serve**, playing the
