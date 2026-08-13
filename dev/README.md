@@ -22,9 +22,9 @@ was changed to add these tools, so taking them out cannot break the book.
 
 Every page in the book in one list; click one and the book goes straight there.
 
-### Opening it — the button is HIDDEN
+### Opening it
 
-Nothing of this tool is on screen by default. To open the menu:
+The **hamburger in the top-left corner** opens it. Two keys do the same:
 
 | | |
 | --- | --- |
@@ -34,15 +34,15 @@ Nothing of this tool is on screen by default. To open the menu:
 Either key also closes it again. Neither is used by the book, which only listens
 for the arrows, Space, Enter and `Esc`, so nothing is taken away from it.
 
-**To bring the hamburger button back** (top-left corner), set one flag at the top
-of `dev-menu.js`:
+**To hide the button** but keep the menu, set one flag at the top of `dev-menu.js`:
 
 ```js
-var SHOW_BUTTON = true;
+var SHOW_BUTTON = false;
 ```
 
-That is the only edit needed. On load, the console prints which keys work and how
-to show the button, so this is never a thing you have to remember.
+That is the only edit needed — both keys still work, and nothing of the tool is
+then on screen. On load the console prints which keys work and the state of this
+flag, so it is never a thing you have to remember.
 
 - **The page you're on is highlighted** in amber, and the highlight keeps
   itself up to date — flip with the arrows while the menu is open and it

@@ -41,11 +41,11 @@
   if (document.querySelector(".devm-btn")) return;         // never double-install
 
   /* ---- SHOW THE BUTTON? ----------------------------------------------------
-     false = the hamburger is HIDDEN, so nothing of this tool is on screen. The
-     menu still works: press ` (backtick) or Ctrl+Alt+D to open it.
-     Set this to true to get the visible button back. That is the only edit
-     needed — everything else is unchanged.                                    */
-  var SHOW_BUTTON = false;
+     true  = the hamburger is visible in the top-left corner.
+     false = it is HIDDEN, so nothing of this tool is on screen; the menu still
+             opens with ` (backtick) or Ctrl+Alt+D.
+     Either way both keys work. This flag is the only edit needed to switch.   */
+  var SHOW_BUTTON = true;
 
   var SPEED   = 8;      // GSAP time multiplier while hopping between pages
   var STEP_MS = 60;     // how often to attempt the next hop

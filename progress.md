@@ -13,7 +13,29 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-13 (latest) — LBD 1's juice-splash wipe rebuilt from the reference
+## 2026-08-13 (latest) — the page-jump menu is back, button and all
+
+Asked for the hamburger again. Two edits, no more: the one `<script
+src="dev/dev-menu.js">` line is back at the bottom of index.html, and
+`SHOW_BUTTON` in `dev/dev-menu.js` is `true` again so the button is visible in the
+top-left rather than key-only. Nothing in `engine/`, `story.js` or the CSS was
+touched — removing that line (and the folder) is still the entire uninstall.
+
+Verified in the real book: both dev files fetched, button visible at 14,14 with 13
+page rows, the active page carries `aria-current` and follows the book as it turns,
+an outside click closes it, so do Esc and picking a page, and the backtick still
+toggles it. Jumps land from **both** the open book and the closed cover — indices
+5, 9 and 1 all exact, no JS errors.
+
+(A first run reported the jump failing. It had not: from a closed cover the menu
+opens the book first, which takes ~6s, and the check had waited 4s. The test now
+waits on the menu's own `busy` lock coming off instead of guessing a duration.)
+
+`dev/README.md` was updated to match — it still described the button as hidden.
+
+---
+
+## 2026-08-13 — LBD 1's juice-splash wipe rebuilt from the reference
 
 The author supplied `splash-transition.md` — the written-up version of this effect —
 and asked for LBD 1 to use it, because the wipe there "is not looking good". Ported
