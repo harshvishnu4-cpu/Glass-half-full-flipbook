@@ -40,6 +40,13 @@
   }
   if (document.querySelector(".devm-btn")) return;         // never double-install
 
+  /* ---- SHOW THE BUTTON? ----------------------------------------------------
+     false = the hamburger is HIDDEN, so nothing of this tool is on screen. The
+     menu still works: press ` (backtick) or Ctrl+Alt+D to open it.
+     Set this to true to get the visible button back. That is the only edit
+     needed — everything else is unchanged.                                    */
+  var SHOW_BUTTON = false;
+
   var SPEED   = 8;      // GSAP time multiplier while hopping between pages
   var STEP_MS = 60;     // how often to attempt the next hop
   var GUARD   = 200;    // hard cap on hop attempts, so a wedge can't spin forever
@@ -103,6 +110,10 @@
   btn.setAttribute("aria-expanded", "false");
   btn.setAttribute("aria-controls", "devmPanel");
   btn.innerHTML = '<span class="devm-bars" aria-hidden="true"><i></i><i></i><i></i></span>';
+  // Hidden by default (see SHOW_BUTTON). The button is still BUILT rather than
+  // skipped, so every path that references it — aria-expanded, focus(), the click
+  // handler — keeps working untouched; it is only invisible.
+  if (!SHOW_BUTTON) btn.classList.add("devm-btn--hidden");
 
   var panel = document.createElement("div");
   panel.className = "devm-panel";
@@ -197,8 +208,15 @@
   }, true);
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && open) { setOpen(false); btn.focus(); }
-  });
+    if (e.key === "Escape" && open) { setOpen(false); btn.focus(); return; }
+    // OPEN/CLOSE BY KEY — this is the only way in while the button is hidden.
+    // ` (backtick) is the quick one; Ctrl+Alt+D is the version that cannot be hit
+    // by accident. Neither is used by the book, which listens for the arrows,
+    // Space, Enter and Escape only — so nothing is stolen from it.
+    var quick  = (e.key === "`" || e.key === "~") && !e.ctrlKey && !e.altKey && !e.metaKey;
+    var chord  = e.ctrlKey && e.altKey && (e.key === "d" || e.key === "D");
+    if (quick || chord) { e.preventDefault(); setOpen(!open); }
+  }, true);   // capture, so the book cannot swallow the key first
 
   /* ---- the jump ------------------------------------------------------------ */
   var busy = false;
@@ -260,5 +278,9 @@
   }
 
   mark();
-  console.info("[dev-menu] ready — " + TOTAL + " pages. Delete dev/ + its script tag to remove.");
+  console.info("[dev-menu] ready — " + TOTAL + " pages. " +
+    (SHOW_BUTTON ? "Button is in the top-left." :
+      "Button HIDDEN: press ` or Ctrl+Alt+D to open the page menu " +
+      "(set SHOW_BUTTON = true in dev/dev-menu.js to show it again).") +
+    " Delete dev/ + its script tag to remove.");
 })();

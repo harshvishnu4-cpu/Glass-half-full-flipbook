@@ -13,7 +13,33 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-13 (latest) — the page-jump menu is back, for testing
+## 2026-08-13 (latest) — the dev hamburger is hidden, the menu still opens
+
+Asked to hide the hamburger. Hiding the button alone would have left the tool
+unreachable — it had no shortcut, only Esc-to-close — so the button is hidden AND a
+key was added to open the menu:
+
+- **backtick** (`` ` ``), or **Ctrl+Alt+D** for the version that cannot be hit by
+  accident. Either also closes it.
+- Neither is used by the book (it listens for the arrows, Space, Enter and Escape),
+  and the listener is capture-phase so the book cannot swallow it. Confirmed the
+  arrows still work: 3 → 2 by ArrowLeft, 2 → 1 by `goPrev()`, 1 → 2 by ArrowRight.
+- One flag brings the button back: `var SHOW_BUTTON = true;` at the top of
+  `dev-menu.js`. The console prints the keys and that flag on every load, so it is
+  not something to remember.
+
+The button is still **built**, just `display: none` — so `aria-expanded`, `focus()`
+and the click handler all keep working untouched. `display` rather than opacity so it
+cannot be tabbed to or clicked by accident, and takes no space over the book.
+
+Verified: the button computes to `display: none` at 0×0, the panel is closed on load,
+backtick opens and closes it, Ctrl+Alt+D opens it, a jump from the keyboard-opened
+menu still lands (page 4), the cover screenshot is completely clean, and the book
+keeps its own arrow keys.
+
+---
+
+## 2026-08-13 — the page-jump menu is back, for testing
 
 Re-enabled the dev hamburger that was removed on 2026-08-11. Everything it needs
 was still on disk in `dev/` (kept inert precisely so it could come back), so this

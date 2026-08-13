@@ -138,3 +138,9 @@
 @media (prefers-reduced-motion: reduce) {
   .devm-panel, .devm-bars i, .devm-btn { transition-duration: 1ms; }
 }
+
+/* Hidden hamburger (dev-menu.js sets SHOW_BUTTON = false).
+   Nothing of this tool is then on screen; the menu opens with ` or Ctrl+Alt+D.
+   display:none rather than opacity/visibility so it cannot be tabbed to or
+   clicked by accident, and takes up no space over the book. */
+.devm-btn--hidden { display: none !important; }
