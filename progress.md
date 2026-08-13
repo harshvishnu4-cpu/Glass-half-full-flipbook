@@ -13,7 +13,75 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-13 (latest) — the testing menu is out of the book again
+## 2026-08-13 (latest) — LBD 1's juice-splash wipe rebuilt from the reference
+
+The author supplied `splash-transition.md` — the written-up version of this effect —
+and asked for LBD 1 to use it, because the wipe there "is not looking good". Ported
+into the game's existing Web Animations code (LBD 1 has no GSAP, and the reference's
+§7 says none is needed — it is three transforms and two callbacks).
+
+**Two defects were captured on real frames first**, which is what the port fixes:
+
+1. **The board went flat pink in ~150ms and then sat there for ~840ms.** The burst ran
+   on an ease-OUT curve, so the blob reached almost full size immediately. It also
+   wasted the 16 droplets: they are the same pink, so once the board is pink there is
+   nothing left to see them against. Now the burst *accelerates* (`power3.in`), the
+   droplets lead it over the live scene, and the splat's ragged edge and white rim are
+   part of the show.
+2. **"Full cover" was not full.** The sheets were 132% of the board tall and covered at
+   -16%, which put the front sheet's drippy bottom edge at 91% of the board — measured
+   at 1000ms, before the drain had even started, **the wooden counter was plainly
+   visible across the bottom ~12%**, including at the moment the scene is swapped
+   behind it. The sheets are now 176% of the board (the reference's ~1.75×) and cover
+   at -10.5%, so the body reaches 131% of the board.
+
+Also from the reference: the blob→sheet **handoff is a snap, not a 340ms crossfade**.
+Both sheets arrive at cover in the SAME frame while the blob is still up, and the blob
+is dropped 50ms later — identical pink on both sides, so there is nothing to see. Only
+the *fall* is staggered (120ms), which is what separates the two drippy edges. Doing it
+the other way round would leave the darker back sheet alone over the board for 120ms.
+
+**Scales are this game's, not the reference's.** `splash.svg` is a ragged splat with
+deep notches and a white rim just inside its edge, so its bounding box covering the
+board is not the same as the painted shape covering it. Swept scale against "is every
+pixel of the board this exact pink?": the first clean scale is **3.8**, so the burst
+goes to **4.8** (settling to 5.05) for ~26% of margin — which also carries the moment
+the viewport suddenly gets bigger during the fullscreen switch.
+
+**Callers now get the hooks the effect is built around**, `playSplashTransition(midFn,
+afterFn)`: midFn under full cover, afterFn once the new scene is revealed. The
+end-screen swap was a hand-picked `SPLASH_COVER_AT = 820`; it is now the midFn, so the
+swap and the cover cannot drift apart. (`endGame` still starts the celebration video at
+`DRAIN_AT` rather than in afterFn — deliberately: a video must already be running
+before the reveal, or the drain uncovers a frozen first frame.)
+
+The sound was re-fitted, since the picture moved: `transation.ogg` now starts **late**,
+at `COVER_AT − (peak − lead-in)` = 470ms, so its impact peak lands exactly on full
+cover and the rush builds through the half of the burst where the blob is accelerating.
+It used to start at t=0, which fired the wet SPLAT at ~450ms while the blob was small.
+
+**Measured, not assumed** (`cover-window.js` scores every captured frame for "is the
+whole board the wipe's pink?", timed from the transition's own start):
+
+| | |
+|---|---|
+| cover window | **741ms → 1221ms** (746 → 1221 with the main thread throttled 4×) |
+| `midFn` fired | 923ms — dead centre of the cover |
+| `afterFn` fired | 2314ms, after the reveal completes at ~2244ms |
+| Play → title hidden | 837ms, under cover |
+| `endGame` → `gameEnd.show` | 926ms, under cover; video playing by 1172ms |
+| in the book | `covered` 824ms → `masked` 1015 → `switched` 1018, fullscreen granted |
+| `file://` | midFn 928, afterFn 2320, everything parked, no errors |
+
+`TRANS.SWALLOWED` (800ms) is the earliest moment anything may rely on the cover, and is
+what the fullscreen handshake uses — deliberately not `COVER_AT`, which would leave the
+switch ~10ms of clearance before the drain. It is a few frames past the measured 741,
+not on it, because an accelerating burst is back-loaded: the shape closes over the
+corners in the last 15% of the burst.
+
+---
+
+## 2026-08-13 — the testing menu is out of the book again
 
 The page-jump menu is no longer loaded: the `<script src="dev/dev-menu.js">` line is
 gone from index.html, so **no dev code runs, nothing is added to the page, and no

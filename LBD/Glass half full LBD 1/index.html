@@ -1066,21 +1066,31 @@ body {
   pointer-events: none;
 }
 #splash.run { display: block; }
-/* the burst blob (splash.svg) — bursts from the centre; JS scales it up to cover */
+/* the burst blob (splash.svg) — bursts from the centre; JS scales it up to cover.
+   53.9% = splash.svg's native 1035px on the 1920-wide design board, so the scale
+   factors in JS mean what the reference says they mean: at scale 3.6 the art
+   reaches ±1863 × ±1836 from the centre, covering a ±960 × ±540 board with room
+   to spare even where its edges are ragged. */
 #splat {
   position: absolute;
   left: 50%; top: 50%;
-  width: 46%;                  /* base size — scaled up in JS to swallow the board */
+  width: 53.9%;                /* 1035px of the 1920 design board */
   aspect-ratio: 1035 / 1020;   /* matches splash.svg's native size */
   transform: translate(-50%,-50%) scale(0);
   opacity: 0;
   will-change: transform, opacity;
 }
-/* full-width pink waves — parked above the board, they drain down through it */
+/* Full-width pink waves — parked above the board, they drain down through it.
+   176% = the sheets' native 1900px on the 1080-tall design board, i.e. ~1.75×
+   the board, which is what makes full cover actually full. At 132% (what this
+   was) the sheet covered the board from -21% to 111%, and the front sheet's
+   drippy bottom edge sits at 85% OF THE SHEET — so it landed at 91% of the
+   board and the counter showed through the bottom strip for the whole of
+   "full cover". translateY percentages below are of the sheet's own height. */
 .wave {
   position: absolute; left: 0; top: 0;
-  width: 100%; height: 132%;
-  transform: translateY(-135%);   /* parked out of sight until the drain */
+  width: 100%; height: 176%;
+  transform: translateY(-113.2%);   /* parked out of sight until the drain */
   will-change: transform;
 }
 .wave svg { width: 100%; height: 100%; display: block; }
@@ -2375,137 +2385,224 @@ function whooshSound() {
     src.start(t); src.stop(t + dur);
   } catch (e) {}
 }
-// droplets that spray ahead of the splat's expanding edge
+// Droplets that spray ahead of the splat's expanding edge. Sizes and distances are
+// the reference's px figures expressed against the board, so they scale with it:
+// launch ring 260 × 200 (13.5% × 18.5%), travel 560–1080px (29–56% of the width)
+// and ×0.7 vertically, size 14–42px. They lead the blob — with the burst easing IN
+// they now spray over the live scene, where they can actually be seen, instead of
+// over an already-pink board.
 function spawnSplashDrops(fx) {
   const rect = fx.getBoundingClientRect();
   const cx = rect.width / 2, cy = rect.height / 2;
+  const k  = rect.width / 1920;                 // board scale, so 14–42px stays 14–42px of design space
   for (let i = 0; i < 16; i++) {
     const d = document.createElement('div');
     d.className = 'splash-drop';
-    const size = 10 + Math.random() * 30;
+    const size = (14 + Math.random() * 28) * k;
     d.style.width = size + 'px';
     d.style.height = size + 'px';
     fx.appendChild(d);
     const ang  = Math.random() * Math.PI * 2;
-    const dist = rect.width * (0.28 + Math.random() * 0.34);
-    const x0 = cx + Math.cos(ang) * rect.width * 0.12 - size / 2;
-    const y0 = cy + Math.sin(ang) * rect.height * 0.14 - size / 2;
+    const dist = rect.width * (0.292 + Math.random() * 0.271);
+    const x0 = cx + Math.cos(ang) * rect.width  * 0.135 - size / 2;
+    const y0 = cy + Math.sin(ang) * rect.height * 0.185 - size / 2;
     const x1 = cx + Math.cos(ang) * dist - size / 2;
-    const y1 = cy + Math.sin(ang) * dist * 0.75 - size / 2;
+    const y1 = cy + Math.sin(ang) * dist * 0.7 - size / 2;
     d.animate([
       { transform: 'translate(' + x0.toFixed(0) + 'px,' + y0.toFixed(0) + 'px) scale(0.6)', opacity: 1 },
       { transform: 'translate(' + x1.toFixed(0) + 'px,' + y1.toFixed(0) + 'px) scale(' + (0.5 + Math.random() * 0.7).toFixed(2) + ')', opacity: 0 }
-    ], { duration: 400 + Math.random() * 260, delay: 120 + Math.random() * 240, easing: 'cubic-bezier(0.2,0.6,0.4,1)', fill: 'forwards' });
+    ], { duration: 400 + Math.random() * 200, delay: 120 + Math.random() * 180, easing: EASE_SOFT_OUT, fill: 'forwards' });
     setTimeout(() => d.remove(), 950);
   }
 }
 
 // ── the pink juice-splash wipe ────────────────────────────────
 // ONE timeline drives the whole effect, and the sound is fitted to it (never the reverse).
-// Phases: splat bursts out → waves glide in behind it → splat crossfades away → waves drain
-// off the bottom, revealing the new scene.
+// Phases: droplets spray out → the blob LUNGES from the centre and swallows the board →
+// held solid (the scene is swapped here) → the blob hands over to two pink sheets in one
+// frame → they drain off the bottom, revealing the new scene behind a wobbling liquid edge.
+//
+// Timing, geometry and easings are the reference write-up of this effect
+// (splash-transition.md). Three things changed from the numbers that were here, each
+// because a captured frame showed why:
+//   • THE BURST NOW ACCELERATES (power3.in) instead of easing out. The ease-out curve
+//     reached full size in ~150ms: the board went flat pink almost immediately and then sat
+//     there, unchanging, for ~840ms. It also wasted the droplets — they are the same pink,
+//     so once the board is pink there is nothing left to see them against.
+//   • THE SHEETS ARE 176% OF THE BOARD, NOT 132%, and cover deeper. At 132%/-16% the front
+//     sheet's drippy bottom edge landed at 91% of the board, so the wooden counter showed
+//     through the bottom strip for the whole of "full cover" — including the moment the
+//     scene is swapped behind it. Measured, not guessed.
+//   • THE BLOB→SHEET HANDOFF IS A SNAP, not a 340ms crossfade. Both sheets arrive at cover
+//     in the SAME frame (only their drain is staggered) while the blob is still up, and the
+//     blob is dropped one beat later. Same pink on both sides, so there is nothing to see;
+//     a crossfade, by contrast, is a window during which any gap in the cover shows.
+// Callers get the two hooks the effect is built around:
+//     playSplashTransition(midFn, afterFn)
+//   midFn   — runs under full cover; do every teardown/rebuild here, it cannot be seen
+//   afterFn — runs once the new scene is fully revealed; entrance animations go here
+// (An entrance run in midFn plays behind the cover and is never seen.)
+// The scales are this game's, not the reference's 3.6 / 3.8. splash.svg is a RAGGED splat
+// with deep notches and a white rim highlight just inside its edge, so its bounding box
+// covering the board is not the same as the painted shape covering it: measured, the board
+// is first completely pink — no notch showing the scene, no rim on screen — at scale 3.8.
+// Bursting to exactly that would mean the cover closes on the very last frame of the burst,
+// so it bursts to 4.8 instead: ~26% of margin, which also carries the moment the viewport
+// suddenly gets BIGGER (the fullscreen switch on Play happens under this cover).
+const SPLAT_BURST  = 4.8;
+const SPLAT_SETTLE = 5.05;   // the reference's ~5% settle past the burst, kept in proportion
 const TRANS = {
-  BURST:    700,   // splat expands from nothing to swallowing the board
-  WAVE_IN:  300,   // waves glide into place BEHIND the opaque splat (overlaps the burst)
-  FADE:     340,   // splat crossfades out once the waves are home
-  DRAIN_AT: 1040,  // waves start falling away
-  DRAIN:    1040,  // how long they take to clear the board
-  STAGGER:   90,   // front wave trails the back one
-  CLEANUP:  2260   // everything parked + torn down
+  LEAD:       50,   // droplets get a head start; the blob has not moved yet
+  BURST:     650,   // blob scale 0 → 4.8, rotate -15° → 8°, accelerating the whole way
+  SETTLE:    220,   // then eases on to 5.05 / 10° — a slight settle at full cover
+  SWALLOWED: 800,   // Cover is GUARANTEED from here, and this is the earliest moment anything
+                    // may rely on. Not the end of the burst: an accelerating burst is
+                    // back-loaded, and the painted shape was measured closing over the board
+                    // at 741ms (746ms with the main thread throttled 4×), so this sits a few
+                    // frames later. Whole measured window: 741ms → 1221ms.
+  COVER_AT:  920,   // LEAD + BURST + SETTLE: the middle of the cover — swap the scene here
+  BEAT:      220,   // held solid before anything drains
+  DRAIN_AT: 1140,   // COVER_AT + BEAT: sheets snap over the board and start falling
+  DRAIN:    1050,   // how long one sheet takes to clear the board
+  STAGGER:   120,   // the front sheet starts falling this much after the back one
+  DONE:     2310,   // DRAIN_AT + STAGGER + DRAIN: the new scene is fully revealed
+  CLEANUP:  2420    // everything parked and torn down
 };
-function playSplashTransition() {
-  const fx    = document.getElementById('splash');
-  if (!fx) return;
-  const splat = document.getElementById('splat');
-  const back  = fx.querySelector('.wave-back');
-  const front = fx.querySelector('.wave-front');
+// The sheets' three positions, in % of the sheet's OWN height (= 176% of the board):
+const WAVE_PARK  = '-113.2%';   // entirely above the board, out of sight
+const WAVE_COVER = '-10.5%';    // wavy top edge above the board, body far past its bottom
+const WAVE_GONE  = '71%';       // fully off the bottom
+// Easings, as the reference's GSAP equivalents
+const EASE_LUNGE    = 'cubic-bezier(0.55, 0.055, 0.675, 0.19)';  // power3.in — the burst
+const EASE_SOFT_OUT = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';    // power1/2.out — settle, droplets
+const EASE_FALL     = 'cubic-bezier(0.55, 0.085, 0.68, 0.53)';   // power2.in — the drain
 
-  // clean restart if a previous run is mid-flight
-  [splat, back, front].forEach(el => el && el.getAnimations().forEach(a => a.cancel()));
+// Pending work of a run that is still in flight. A second transition starting on top of one
+// would otherwise drop its predecessor's midFn on the floor — and midFn is where the scene
+// swap lives, so losing it would strand the game on the old scene.
+let transTimers  = [];
+let transPending = null;
+function flushTransPending() {
+  const p = transPending; transPending = null;
+  if (!p) return;
+  if (p.mid)   { try { p.mid();   } catch (e) {} }
+  if (p.after) { try { p.after(); } catch (e) {} }
+}
+function playSplashTransition(midFn, afterFn) {
+  const fx    = document.getElementById('splash');
+  const splat = document.getElementById('splat');
+  const back  = fx && fx.querySelector('.wave-back');
+  const front = fx && fx.querySelector('.wave-front');
+  // No wipe available → the scene must still change, so run both hooks straight away
+  // rather than leaving the caller waiting for a cover that is never coming.
+  if (!fx || !splat || !back || !front) {
+    if (midFn) midFn();
+    if (afterFn) afterFn();
+    return;
+  }
+
+  // clean restart if a previous run is mid-flight (its hooks are honoured first)
+  transTimers.forEach(clearTimeout); transTimers = [];
+  flushTransPending();
+  transPending = { mid: midFn, after: afterFn };
+  const later = (fn, ms) => transTimers.push(setTimeout(fn, ms));
+
+  [splat, back, front].forEach(el => el.getAnimations().forEach(a => a.cancel()));
   fx.querySelectorAll('.splash-drop').forEach(d => d.remove());
-  back.style.transform  = 'translateY(-135%)';     // waves parked above the board
-  front.style.transform = 'translateY(-135%)';
+  back.style.transform  = 'translateY(' + WAVE_PARK + ')';   // sheets parked above the board
+  front.style.transform = 'translateY(' + WAVE_PARK + ')';
   splat.style.opacity   = '1';
   splat.style.transform = 'translate(-50%,-50%) scale(0)';
   fx.classList.add('run');
-  playTransitionSfx();                             // sound fitted to the timeline above
+  playTransitionSfx();                                       // sound fitted to the timeline above
 
-  // The splat bursts OUT: fast off the mark, easing into its full size. (This used to run on
-  // an ease-IN curve, which sat still for ~200ms and then lurched — the main source of the
-  // jerk.) A little rotation keeps the blob from looking like a plain scale.
+  spawnSplashDrops(fx);                                      // droplets lead, over the live scene
+
+  // The blob LUNGES: barely moving for the first beat, then accelerating into the board and
+  // swallowing it. The rotation keeps it from reading as a plain scale.
+  const CENTRE = 'translate(-50%,-50%) ';
   splat.animate([
-    { transform: 'translate(-50%,-50%) scale(0)    rotate(-14deg)' },
-    { transform: 'translate(-50%,-50%) scale(3.1)  rotate(-2deg)'  },
-    { transform: 'translate(-50%,-50%) scale(4.8)  rotate(9deg)'   }
-  ], { duration: TRANS.BURST, easing: 'cubic-bezier(0.16,0.84,0.3,1)', fill: 'forwards' });
-  spawnSplashDrops(fx);
+    { transform: CENTRE + 'scale(0) rotate(-15deg)', easing: EASE_LUNGE },
+    { offset: TRANS.BURST / (TRANS.BURST + TRANS.SETTLE),
+      transform: CENTRE + 'scale(' + SPLAT_BURST  + ') rotate(8deg)', easing: EASE_SOFT_OUT },
+    { transform: CENTRE + 'scale(' + SPLAT_SETTLE + ') rotate(10deg)' }
+  ], { duration: TRANS.BURST + TRANS.SETTLE, delay: TRANS.LEAD, fill: 'both' });
 
-  // Each wave runs as ONE continuous animation — park, glide in behind the splat, hold at
-  // full cover, then drain away. Doing it as a single track (rather than a glide animation
-  // followed by a separate drain animation) means the phases cannot hand off with a jump:
-  // there is no seam for the two to disagree about. (.wave has no CSS transition either, so
-  // the old `style.transform = ...` cover was an instant teleport mid-effect.)
-  const glideAt = TRANS.BURST - TRANS.WAVE_IN + 40;   // starts while the splat still hides it
-  const coverAt = TRANS.BURST + 40;                   // home just as the splat peaks
-  const waveTrack = (delay) => {
+  // Each sheet is ONE animation: parked → (snap to cover at DRAIN_AT) → drain away. The snap
+  // is a steps(1) segment, so the sheet holds its parked position and then arrives in a single
+  // frame, under the blob. Both sheets snap at the SAME instant — only the fall is staggered,
+  // which is what separates the two drippy edges and gives the drain depth. (Staggering the
+  // arrival instead would leave the darker back sheet alone over the board for 120ms.)
+  const sheetTrack = (delay) => {
     const total = TRANS.DRAIN_AT + delay + TRANS.DRAIN;
     const at = ms => Math.min(1, Math.max(0, ms / total));
-    return {
-      keyframes: [
-        { offset: 0,                          transform: 'translateY(-135%)' },
-        { offset: at(glideAt),                transform: 'translateY(-135%)',
-          easing: 'cubic-bezier(0.3,0.7,0.3,1)' },                    // glide in
-        { offset: at(coverAt),                transform: 'translateY(-16%)' },
-        { offset: at(TRANS.DRAIN_AT + delay), transform: 'translateY(-16%)',
-          easing: 'cubic-bezier(0.45,0.05,0.75,0.6)' },               // fall under gravity
-        { offset: 1,                          transform: 'translateY(116%)' }
-      ],
-      total: total
-    };
+    const k = [
+      { offset: 0,                    transform: 'translateY(' + WAVE_PARK + ')',
+        easing: 'steps(1, end)' },                                  // hold, then snap
+      { offset: at(TRANS.DRAIN_AT),   transform: 'translateY(' + WAVE_COVER + ')' }
+    ];
+    if (delay) k.push({ offset: at(TRANS.DRAIN_AT + delay),
+                        transform: 'translateY(' + WAVE_COVER + ')' });   // wait its turn
+    k[k.length - 1].easing = EASE_FALL;                                   // ...then fall
+    k.push({ offset: 1, transform: 'translateY(' + WAVE_GONE + ')' });
+    return { keyframes: k, total: total };
   };
   [[back, 0], [front, TRANS.STAGGER]].forEach(([w, delay]) => {
-    const tr = waveTrack(delay);
+    const tr = sheetTrack(delay);
     w.animate(tr.keyframes, { duration: tr.total, fill: 'forwards' });
   });
 
-  // ...and the splat crossfades away over the waves (same pink, so the seam is invisible)
-  setTimeout(() => {
-    splat.animate([{ opacity: 1 }, { opacity: 0 }],
-      { duration: TRANS.FADE, easing: 'ease-in-out', fill: 'forwards' });
-  }, coverAt);
+  // The scene changes here, with the board solidly covered.
+  later(() => { if (transPending) transPending.mid = null; if (midFn) midFn(); }, TRANS.COVER_AT);
 
-  // tidy up after the drain finishes
-  setTimeout(() => {
-    [splat, back, front].forEach(el => el && el.getAnimations().forEach(a => a.cancel()));
+  // The blob is dropped a frame or two AFTER the sheets have arrived, never before: an overlap
+  // is invisible (identical pink), whereas hiding it early would flash the scene through.
+  later(() => { splat.style.opacity = '0'; }, TRANS.DRAIN_AT + 50);
+
+  // ...and the new scene is now fully revealed.
+  later(() => { if (transPending) transPending.after = null; if (afterFn) afterFn(); }, TRANS.DONE);
+
+  // tidy up: park everything, so the next run starts from a known state
+  later(() => {
+    transPending = null;
+    [splat, back, front].forEach(el => el.getAnimations().forEach(a => a.cancel()));
     fx.classList.remove('run');
-    back.style.transform  = 'translateY(-135%)';
-    front.style.transform = 'translateY(-135%)';
+    back.style.transform  = 'translateY(' + WAVE_PARK + ')';
+    front.style.transform = 'translateY(' + WAVE_PARK + ')';
     splat.style.opacity   = '0';
     splat.style.transform = 'translate(-50%,-50%) scale(0)';
     fx.querySelectorAll('.splash-drop').forEach(d => d.remove());
   }, TRANS.CLEANUP);
 }
 
-// Fit the SFX to the visual timeline above.
-//  • transation.ogg opens with ~120ms of digital silence — skipped, so the whoosh is audible
-//    from the first frame of the burst instead of trailing it
-//  • its impact peak (~480-660ms in the file) then lands as the splat swallows the board
-//  • the file runs 3.06s but the wipe is done at ~2.1s, so the tail is faded out to finish
+// Fit the SFX to the visual timeline above — the sound follows the picture, never the reverse.
+//  • transation.ogg opens with ~120ms of digital silence, skipped, so playback starts on the
+//    rush rather than on dead air
+//  • its impact peak sits ~480-660ms into the file (call it 570ms). Playback therefore STARTS
+//    LATE, at COVER_AT - (570 - 120) = 470ms, which lands that peak exactly on full cover.
+//    The rush then builds through the second half of the burst — the half where the blob is
+//    actually accelerating — instead of being over before the blob has gone anywhere. (It used
+//    to start at t=0, which put the wet SPLAT at ~450ms, while the blob was still small.)
+//  • the file runs 3.06s but the wipe is done at 2.31s, so the tail is faded out to finish
 //    WITH the drain rather than bleeding into the next scene
 const SFX_LEAD_IN = 0.12;                                  // measured dead air at the top
+const SFX_PEAK    = 0.57;                                  // measured impact peak in the file
 function playTransitionSfx() {
   const s = transitionSound;
   if (!s) return;
+  const startAt   = Math.max(0, TRANS.COVER_AT - (SFX_PEAK - SFX_LEAD_IN) * 1000);
   const fadeStart = TRANS.DRAIN_AT + TRANS.DRAIN * 0.45;   // begin fading mid-drain
   const fadeMs    = (TRANS.CLEANUP - 160) - fadeStart;
   if (s._fade) { clearInterval(s._fade); s._fade = null; }
-  try {
-    s.volume = 0.7;
-    s.currentTime = SFX_LEAD_IN;
-    s.play().catch(() => {});
-  } catch (e) { return; }
-  setTimeout(() => {                                       // smooth tail-out, then stop
-    const v0 = s.volume, t0 = Date.now();
+  transTimers.push(setTimeout(() => {
+    try {
+      s.volume = 0.7;
+      s.currentTime = SFX_LEAD_IN;
+      s.play().catch(() => {});
+    } catch (e) {}
+  }, startAt));
+  transTimers.push(setTimeout(() => {                      // smooth tail-out, then stop
+    const v0 = s.volume || 0.7, t0 = Date.now();
     s._fade = setInterval(() => {
       const k = Math.min(1, (Date.now() - t0) / Math.max(120, fadeMs));
       s.volume = Math.max(0, v0 * (1 - k));
@@ -2514,7 +2611,7 @@ function playTransitionSfx() {
         try { s.pause(); s.currentTime = SFX_LEAD_IN; s.volume = v0; } catch (e) {}
       }
     }, 40);
-  }, fadeStart);
+  }, fadeStart));
 }
 
 // a wet juice-splash sound: liquid rush → SPLAT at full cover → droplets → drain
@@ -4129,10 +4226,10 @@ const CONFETTI_COLORS = ['#FF7ED8', '#CE9EFF', '#FFD84D', '#7FE0FF', '#FF9E5A', 
 let confettiTimer = null;
 let endWatchdog = null;      // safety net that freezes the end video if 'ended' never fires
 let endFrozen = false;       // true once the end video is parked on its final frame
-// When to swap the end screen in behind the splash wipe: the splat finishes swallowing the
-// board at TRANS.BURST (700ms) and the waves only start draining at TRANS.DRAIN_AT (1040ms),
-// so anywhere in between is fully covered. 820ms sits comfortably in that window.
-const SPLASH_COVER_AT = 820;
+// When the end screen is swapped in behind the splash wipe is no longer a number kept here:
+// the wipe takes a midFn and runs it at TRANS.COVER_AT, under full cover, so the swap and the
+// cover cannot drift apart. (This used to be a hand-picked 820ms — which was inside the cover
+// WINDOW, but the cover itself did not reach the bottom of the board back then.)
 function makeConfettiPiece() {
   const box = document.getElementById('confetti');
   if (!box) return;
@@ -4224,16 +4321,17 @@ function endGame() {
   }  // ── end startCelebration ──
 
   // ── the transition: the same juice-splash wipe the tutorial ends with ──
-  // playSplashTransition() bursts the pink splat out to swallow the board, slides two waves in
-  // behind it, holds at full cover, then drains them away to reveal whatever is underneath —
-  // and it brings its own sfx, fitted to that timeline. Reused here verbatim, so the end of the
+  // playSplashTransition() lunges the pink splat out to swallow the board, hands over to two
+  // pink sheets under the cover, then drains them away to reveal whatever is underneath — and
+  // it brings its own sfx, fitted to that timeline. Reused here verbatim, so the end of the
   // game reads exactly like the end of the tutorial.
-  //   • the end screen is swapped in at SPLASH_COVER_AT, while the splat has the board
-  //     completely covered — the switch itself is never visible, no cut, no blank frame
-  //   • the celebration starts as the waves BEGIN to drain, so the video is already alive as it
-  //     is revealed, the way the tutorial's wipe reveals a live scene rather than a still
-  playSplashTransition();
-  setTimeout(() => { if (end) end.classList.add('show'); }, SPLASH_COVER_AT);
+  //   • the end screen is swapped in as the wipe's midFn, i.e. at TRANS.COVER_AT with the
+  //     board completely covered — the switch itself is never visible, no cut, no blank frame
+  //   • the celebration starts as the sheets BEGIN to drain, so the video is already alive as
+  //     it is revealed, the way the tutorial's wipe reveals a live scene rather than a still.
+  //     (Deliberately NOT the wipe's afterFn: a video has to be running before the reveal, not
+  //     started by it, or the drain uncovers a frozen first frame.)
+  playSplashTransition(() => { if (end) end.classList.add('show'); });
   setTimeout(startCelebration, TRANS.DRAIN_AT);
 }
 
@@ -4833,20 +4931,15 @@ initRound();
   //    instant start, replace the body of the handler below with `start();`.
   //
   // Timing comes from the game's OWN constants so the two cannot drift apart.
-  // The wipe holds full cover only from ~740ms (waves home, TRANS.BURST + 40) to
-  // TRANS.DRAIN_AT = 1040ms — a 300ms window — and the game already names the
-  // safe moment inside it: SPLASH_COVER_AT (820ms), which is where it swaps its
-  // own end screen in. Switching at BURST + 30 = 730ms was ~10ms BEFORE the waves
-  // were even home, so the switch straddled the moment the cover completed and
-  // was still settling as the drain began. That was the roughness. Use the game's
-  // own number: 80ms after full cover, 220ms of clearance before the drain.
-  // The wipe holds full cover from BURST + 40 (its own `coverAt` — the waves reach
-  // home) until DRAIN_AT = 1040ms. Ask at the START of that window, not the middle:
-  // the book now FADES its mask in over 160ms before answering `masked`, and the
-  // switch itself measured ~50ms, so asking at 740 lands the switch at ~950 — still
-  // 90ms clear of the drain. (Asking at 820 left too little room; asking at 730, as
-  // this first did, was before the waves were even home.)
-  var COVERED = (typeof TRANS === 'object' && TRANS && TRANS.BURST) ? TRANS.BURST + 40 : 740;
+  // The wipe covers the board from TRANS.SWALLOWED (800ms — the blob has swallowed
+  // it) until TRANS.DRAIN_AT (1140ms), a 340ms window. Ask at the START of
+  // it, not in the middle: the book FADES its mask in over 160ms before answering
+  // `masked`, and the switch itself measured ~50ms, so asking at 800 lands the
+  // switch at ~1010 — still 130ms clear of the drain. Deliberately NOT the wipe's
+  // own midFn (TRANS.COVER_AT, 920ms): that would leave only ~10ms of clearance,
+  // and a switch still settling as the drain begins is exactly the roughness this
+  // handshake exists to remove.
+  var COVERED = (typeof TRANS === 'object' && TRANS && TRANS.SWALLOWED) ? TRANS.SWALLOWED : 700;
 
   var started = false;
   function start() {                    // fullscreen, then hand over to the game
@@ -4947,7 +5040,7 @@ initRound();
         tell(shown ? 'end' : 'restart');
       }).observe(endEl, { attributes: true, attributeFilter: ['class'] });
       // …and again when the celebration has finished PLAYING, which is a separate
-      // moment: `.show` goes on at SPLASH_COVER_AT but the video does not start
+      // moment: `.show` goes on at TRANS.COVER_AT but the video does not start
       // until DRAIN_AT and then runs 4.02s. The book waits for this before leaving
       // fullscreen, so the reward is watched full size and the reader is handed
       // back to the book only once there is nothing left to watch. (`freeze` keeps
