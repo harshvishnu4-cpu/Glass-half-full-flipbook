@@ -13,7 +13,60 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-12 (latest) — the poured juice fell BEHIND the glass
+## 2026-08-12 (latest) — LBD 1's fresh glass inflated instead of dropping in
+
+Reported as "the glass pop for few second and its looking akward", narrowed with the
+author to the **fresh glass that appears in the machine after a serve**, playing the
+game standalone.
+
+The sequence itself turned out to be correct, so the bug was in the animation, not
+the timing. Measured in isolation (`hideMachineGlass()` + `rewardCoins()`):
+
+| | |
+| --- | --- |
+| glass hidden | 5ms |
+| coins land | 6ms |
+| coins fade | 912ms |
+| glass `appearIn` | 1640ms |
+| at rest | 2161ms |
+
+That matches `COIN.HOLD` 900 + `COIN.FADE` 700 + 20 exactly, and the
+`noCustomersLeft()` guard is complete — it covers `phase === 'gameover'`, non-pair
+mode, customers still due, an **empty** queue, and the last-served case. (I first
+thought the empty-queue case was missing and was wrong; it is handled.)
+
+### What was actually wrong
+
+The keyframes claimed to "drop into the slot" but did the opposite. Sampling the
+computed transform frame by frame:
+
+- `transform-origin: center bottom` with `scale(0.7)` meant the glass's top edge
+  started **17px BELOW** its resting position (top 570 against a resting 553) and
+  **grew upward out of the machine floor** — inflating, not dropping.
+- The back-out curve `cubic-bezier(0.34,1.56,0.64,1)` then swelled it to **scale
+  1.029 at 275ms**, 2.9% over its resting size, before it settled back.
+
+A glass ballooning up out of the bay and wobbling past its own size is what looked
+awkward. Now it is placed: `transform-origin: center center`, no scaling at all, and
+a plain ease-out from `translateY(-9%)` to 0 over 450ms. Re-measured: scale is
+**exactly 1 throughout, 0% overshoot**, and the glass starts 10px **above** its slot
+(top 543 → 553), so it genuinely drops in and fades up. Confirmed on frames.
+
+### Testing notes from this one
+
+- `#glass` is an **SVG** element, so `element.className` is an `SVGAnimatedString`,
+  not a string — logging it prints `[object SVGAnimatedString]`. Use
+  `getAttribute("class")`.
+- LBD 1's inline handlers expose usable globals: `pour()`, `addStrawToServed()`,
+  `addLemonToServed()`, plus `hideMachineGlass()` / `showMachineGlass()` /
+  `rewardCoins()`. Driving those directly reproduces a post-serve state in seconds,
+  where scripting the full drag-and-drop flow kept failing at the tray drop.
+- `skipDialogue` is a top-level `let`, so it is NOT reachable from outside; `?debug=1`
+  loads only an asset-positioning overlay, not a flow skipper.
+
+---
+
+## 2026-08-12 — the poured juice fell BEHIND the glass
 
 Reported as "the pouring juice falling behind the glass not in the glass", and that
 is exactly what it was — not an alignment drift but a paint-order bug.
