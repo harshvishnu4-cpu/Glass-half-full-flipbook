@@ -326,19 +326,14 @@
      760ms timer, matching bookDrop's landing frame, and skipped entirely under
      prefers-reduced-motion. -->
 
-<!-- ══ TESTING ONLY — the page-jump hamburger ═══════════════════════════════════
-     A menu in the top-left that lists every page and jumps straight to any of
-     them, so a page late in the book can be reached without sitting through the
-     whole story. It highlights the page you are on, and closes when you pick a
-     page, click outside it, or press Esc.
+<!-- The testing page-jump menu is NOT loaded. The book ships without it: no dev
+     code runs, nothing is added to the page, and no dev file is even fetched.
 
-     EVERYTHING it needs lives in  dev/  — this is the only line anywhere else in
-     the project. TO REMOVE THE TOOL COMPLETELY when testing is done:
-        1. delete this <script> line
-        2. delete the  dev/  folder
-     Nothing in engine/, story.js or the CSS refers to it, so deleting it cannot
-     affect the book. It also refuses to start if window.STORY is missing.
-     ═══════════════════════════════════════════════════════════════════════════ -->
-<script src="dev/dev-menu.js"></script>
+     The  dev/  folder is still on disk and completely inert without the line
+     below. To use it while authoring, put this back:
+       <script src="dev/dev-menu.js"></script>
+     Then press ` or Ctrl+Alt+D to open the menu (or set SHOW_BUTTON = true in
+     dev/dev-menu.js for the visible hamburger). Delete the dev/ folder too for a
+     final clean-out — nothing in engine/, story.js or the CSS refers to it. -->
 </body>
 </html>

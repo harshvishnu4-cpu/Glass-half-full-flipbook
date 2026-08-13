@@ -13,7 +13,25 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-13 (latest) — the dev hamburger is hidden, the menu still opens
+## 2026-08-13 (latest) — the testing menu is out of the book again
+
+The page-jump menu is no longer loaded: the `<script src="dev/dev-menu.js">` line is
+gone from index.html, so **no dev code runs, nothing is added to the page, and no
+dev file is even requested**.
+
+Verified: no `.devm-btn`, no `.devm-panel`, zero elements with a `devm` class, no
+`dev-menu` stylesheet, **no network request to `dev/` at all**, and the backtick /
+Ctrl+Alt+D shortcuts are inert. The book itself still opens and navigates (reached
+page 2), with no JS errors.
+
+`dev/` is still on disk and completely inert. To use it again while authoring, put
+that one line back; then press `` ` `` or Ctrl+Alt+D, or set `SHOW_BUTTON = true` in
+`dev-menu.js` for the visible hamburger. Delete the folder as well for a final
+clean-out — nothing in `engine/`, `story.js` or the CSS refers to it.
+
+---
+
+## 2026-08-13 — the dev hamburger is hidden, the menu still opens
 
 Asked to hide the hamburger. Hiding the button alone would have left the tool
 unreachable — it had no shortcut, only Esc-to-close — so the button is hidden AND a
