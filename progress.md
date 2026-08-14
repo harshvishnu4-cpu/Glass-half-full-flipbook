@@ -13,7 +13,42 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-13 (latest) — the page-jump menu is back, button and all
+## 2026-08-14 (latest) — LBD 2: the lemons and straws pulsed over the instruction
+
+The garnish boxes started glowing and bobbing the instant level 2 opened, while Agni
+was still saying "Tap the lemons and the straws." — so the thing being explained was
+already flashing "tap me" over the explanation.
+
+One line moved. In `transitionToPhase2`'s afterFn, `startGarnishNudge()` was called
+in parallel with `showTutMascot(TUT[4], …)`; it is now inside that call's `onDone`,
+next to the `state.locked = false` that was *already* correctly gated there.
+`onDone` fires from `lineDone()`, i.e. only once the line is fully typed AND spoken.
+
+Worth noting the old arrangement was self-contradicting, not just noisy: taps were
+locked out until the line ended anyway, so for the whole instruction the boxes were
+advertising an interaction the game would refuse.
+
+Measured by playing level 1 through for real (nine drags — `game.js` is an IIFE and
+exposes only `window.__game`, so there is no shortcut into level 2), then timing the
+`nudge-glow` class against `state.speaking`:
+
+| | pulse begins |
+|---|---|
+| before | **0ms into** the 3402ms instruction — glowing through all of it ✗ |
+| after | **3394ms in**, 0ms after the instruction ends ✓ |
+
+Two testing notes for next time. `#play-btn` listens for **pointerdown**, not click —
+a `.click()` leaves the title up and every later drag lands on the overlay, which
+looked exactly like broken drag handling. And the bubble text is **typed**, so
+matching on the full sentence dates the line's start to just before its end; use
+`state.speaking`, which spans the real line.
+
+The idle-nudge path was checked too — it deliberately leaves the garnish step alone
+("the untapped boxes already glow"), so this single call site was the whole bug.
+
+---
+
+## 2026-08-13 — the page-jump menu is back, button and all
 
 Asked for the hamburger again. Two edits, no more: the one `<script
 src="dev/dev-menu.js">` line is back at the bottom of index.html, and

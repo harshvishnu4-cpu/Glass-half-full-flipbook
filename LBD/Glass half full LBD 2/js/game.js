@@ -834,12 +834,18 @@
     }, function () {
       /* level 2 opens by asking the player to dress the drinks; no customer
          arrives until both the lemon and straw have been added. The boxes
-         become tappable the moment Agni finishes saying the line. */
+         become tappable — AND start nudging — the moment Agni finishes the line.
+         Both live inside onDone deliberately: the pulse used to start here, in
+         parallel with the line, so the lemons and straws were flashing "tap me"
+         while Agni was still saying what to do. It asked to be interrupted, and
+         a tap during that window did nothing anyway (state.locked was still on
+         until the line ended), so the glow was writing a cheque the game would
+         not honour. onDone fires only once the line is fully typed AND spoken. */
       showTutMascot(TUT[4], function () { /* "Tap the lemons and the straws." */
-        state.locked = false; /* line fully typed and spoken — tap away! */
+        state.locked = false;             /* line fully typed and spoken — tap away! */
+        startGarnishNudge();              /* ...and only now do the boxes glow & bob */
         tutLater(1.5, function () { hideTutMascot(); });
       });
-      startGarnishNudge();   /* the garnish boxes glow & bob until tapped */
     });
   }
 
