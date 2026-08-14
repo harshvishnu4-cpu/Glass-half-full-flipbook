@@ -326,14 +326,15 @@
      760ms timer, matching bookDrop's landing frame, and skipped entirely under
      prefers-reduced-motion. -->
 
-<!-- ── TESTING PAGE-JUMP MENU — delete this one line to ship without it ──
-     A hamburger in the top-left corner listing every page, so authoring doesn't
-     mean sitting through the book to reach page 9. The page you are on is
-     highlighted; picking a page or clicking outside closes it; so does Esc.
-     ` or Ctrl+Alt+D toggles it too, which is the way in if the button is ever
-     hidden again (SHOW_BUTTON in dev/dev-menu.js).
-     Nothing in engine/, story.js or the CSS knows about any of this — removing
-     the line below, and the dev/ folder, is the entire uninstall. -->
-<script src="dev/dev-menu.js"></script>
+<!-- The testing page-jump menu is NOT loaded. The book ships without it: no dev
+     code runs, nothing is added to the page, and no dev file is even fetched.
+
+     The  dev/  folder is still on disk and completely inert without the line
+     below. To bring the hamburger back while authoring, put this one line back:
+       <script src="dev/dev-menu.js"></script>
+     Nothing else needs changing — dev-menu.js still has SHOW_BUTTON = true, so
+     that alone restores the visible button in the top-left (and `` ` `` or
+     Ctrl+Alt+D open the menu either way). Delete the dev/ folder too for a final
+     clean-out — nothing in engine/, story.js or the CSS refers to it. -->
 </body>
 </html>

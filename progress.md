@@ -13,7 +13,22 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-14 (latest) — LBD 2: the glow now waits for Agni to LEAVE, not just stop
+## 2026-08-14 (latest) — the page-jump menu is out of the book again
+
+The `<script src="dev/dev-menu.js">` line is gone from index.html, so no dev code
+runs, nothing is added to the page and no dev file is even fetched.
+
+Verified: no `.devm-btn`, no `.devm-panel`, zero elements with a `devm` class, no
+`dev-menu` stylesheet, **no request to `dev/` at all**, and the backtick /
+Ctrl+Alt+D shortcuts are inert. The book still opens and turns pages, no JS errors.
+
+`SHOW_BUTTON` was deliberately left at `true` in `dev-menu.js`, so putting that one
+line back restores exactly what was there — visible hamburger and all — with no
+second edit. Delete the `dev/` folder as well for a final clean-out.
+
+---
+
+## 2026-08-14 — LBD 2: the glow now waits for Agni to LEAVE, not just stop
 
 The earlier fix (below) was measured against the wrong finish line. Moving the nudge
 into the line's `onDone` stopped it glowing over the *words*, but the instruction is
