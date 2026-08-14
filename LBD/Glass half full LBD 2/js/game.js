@@ -833,18 +833,25 @@
       state.demandQueue = shuffle(['half', 'half', 'half', 'full', 'full', 'full']);
     }, function () {
       /* level 2 opens by asking the player to dress the drinks; no customer
-         arrives until both the lemon and straw have been added. The boxes
-         become tappable — AND start nudging — the moment Agni finishes the line.
-         Both live inside onDone deliberately: the pulse used to start here, in
-         parallel with the line, so the lemons and straws were flashing "tap me"
-         while Agni was still saying what to do. It asked to be interrupted, and
-         a tap during that window did nothing anyway (state.locked was still on
-         until the line ended), so the glow was writing a cheque the game would
-         not honour. onDone fires only once the line is fully typed AND spoken. */
+         arrives until both the lemon and straw have been added.
+         THE INSTRUCTION IS NOT OVER WHEN THE LINE ENDS. Two separate moments:
+           • onDone — the line is fully typed and spoken, so the hands are freed
+             and the boxes become tappable;
+           • the bubble is still on screen for 1.5s after that, and then takes
+             ~0.55s to leave.
+         The nudge waits for the SECOND one. It first ran in parallel with the
+         line (flashing "tap me" over the words explaining it, while taps were
+         still locked out); moving it to onDone fixed the words but not the
+         picture — the boxes still pulsed under a bubble that was sitting there
+         saying "Tap the lemons and the straws." Now nothing competes with the
+         instruction: it is spoken, typed, AND gone before anything glows. */
       showTutMascot(TUT[4], function () { /* "Tap the lemons and the straws." */
         state.locked = false;             /* line fully typed and spoken — tap away! */
-        startGarnishNudge();              /* ...and only now do the boxes glow & bob */
-        tutLater(1.5, function () { hideTutMascot(); });
+        tutLater(1.5, function () {
+          hideTutMascot();
+          /* his bubble fades over 0.25s and he is off screen by 0.55s */
+          tutLater(0.6, startGarnishNudge);
+        });
       });
     });
   }
@@ -1201,7 +1208,14 @@
       gsap.to(el, { scale: 1, duration: 0.25, overwrite: 'auto' });
     }
   }
-  function startGarnishNudge() { nudgeBox('lemonbox', true); nudgeBox('strawbox', true); }
+  /* A box that has already been used must never light up again. This matters
+     because the nudge starts a couple of seconds AFTER the boxes become
+     tappable (it waits for Agni's bubble to leave), so a quick player can have
+     tapped one — or both — before it ever runs. */
+  function startGarnishNudge() {
+    if (!state.lemonTapped) nudgeBox('lemonbox', true);
+    if (!state.strawTapped) nudgeBox('strawbox', true);
+  }
   function stopGarnishNudge() { nudgeBox('lemonbox', false); nudgeBox('strawbox', false); }
 
   /* tapping a garnish box dresses every glass on the trays */

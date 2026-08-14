@@ -13,7 +13,46 @@ changed, how the new systems work, and where to tune things. Last updated: **202
 
 ---
 
-## 2026-08-14 (latest) — LBD 2: the lemons and straws pulsed over the instruction
+## 2026-08-14 (latest) — LBD 2: the glow now waits for Agni to LEAVE, not just stop
+
+The earlier fix (below) was measured against the wrong finish line. Moving the nudge
+into the line's `onDone` stopped it glowing over the *words*, but the instruction is
+still on screen after that: **the bubble sits there for another 1.5s and then takes
+~0.55s to leave**, so the boxes were still pulsing under a bubble reading "Tap the
+lemons and the straws." That is what was still being seen, and it was a fair report —
+"the line has ended" and "the instruction is over" are two different moments.
+
+The nudge now starts after `hideTutMascot()` has actually taken the bubble away:
+
+```js
+showTutMascot(TUT[4], function () {
+  state.locked = false;                 // typed + spoken: tap away
+  tutLater(1.5, function () {
+    hideTutMascot();
+    tutLater(0.6, startGarnishNudge);   // ...and only once his bubble has gone
+  });
+});
+```
+
+Measured end to end: instruction starts 7721ms → line ends 11134 → **bubble gone
+12934 → glow 13242**, i.e. 308ms after the last of the instruction leaves the screen.
+
+**That delay opens a race**, so `startGarnishNudge()` was guarded: the boxes are
+tappable ~2.1s before the nudge runs, and without the guard a box tapped in that
+window would be lit up again by it. Both cases tested:
+
+- lemon tapped early → glow starts with **lemon off, straw on** ✓
+- both tapped early → **nothing glows at all**, trays centre, the cheer plays and four
+  customers file in ✓
+
+A testing note worth keeping: `page.evaluate(fn, arg)` where fn returns a Promise —
+the `new Promise(...)` must be closed *before* the argument (`}), ARG);` not
+`}, ARG));`). Getting it wrong silently passes the argument to `new Promise` and it
+fails inside the page as "ARG is not defined".
+
+---
+
+## 2026-08-14 — LBD 2: the lemons and straws pulsed over the instruction
 
 The garnish boxes started glowing and bobbing the instant level 2 opened, while Agni
 was still saying "Tap the lemons and the straws." — so the thing being explained was
